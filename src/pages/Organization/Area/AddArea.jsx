@@ -34,7 +34,7 @@ const AddArea = () => {
     if (params.id) {
       getAreaDetails();
     }
-  }, [params.id,getAreaDetails]);
+  });
 
   const getAreaDetails = async () => {
     try {
@@ -244,15 +244,17 @@ const AddArea = () => {
                           size="large"
                           loading={lineLoader}
                         >
-                          {lineList?.map((line) => {
-                            if (formData?.branch_id === line?.branch) {
-                              return (
-                                <Option key={line?.lineName} value={line?.id}>
-                                  {line?.lineName}
-                                </Option>
-                              );
-                            }
-                          })}
+                         {lineList?.map((line) => {
+  if (formData?.branch_id === line?.branch) {
+    return (
+      <Option key={line?.lineName} value={line?.id}>
+        {line?.lineName}
+      </Option>
+    );
+  }
+  return null; // always return something
+})}
+
                         </Select>
                       </Form.Item>
                     </div>

@@ -21,7 +21,7 @@ const AddExpense = () => {
             setIsEditMode(true);
             fetchExpenseData(id);
         }
-    }, [id]);
+    });
 
     const fetchExpenseData = useCallback(async (expenseId) => {
         setLoading(true);
