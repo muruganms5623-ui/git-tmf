@@ -69,7 +69,7 @@ const AddBranch = () => {
       });
       setAdditionalFiles([null]); // one placeholder slot
     }
-  }, [params?.id,form]);
+  });
 
 
 

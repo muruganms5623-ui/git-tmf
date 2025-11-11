@@ -14,14 +14,12 @@ import SwipeablePanel from "components/Common/SwipeablePanel";
 const ListBranch = () => {
   const [loading, setLoading] = useState(false);
   const [branches, setBranches] = useState([]);
-  // eslint-disable-next-line no-unused-vars
-const [_deleteLoader, setDeleteLoader] = useState(false);
- // eslint-disable-next-line no-unused-vars
-const [showConfirm, setShowConfirm] = useState(false);
+  
+  // const [deleteLoader, setDeleteLoader] = useState(false);
+  // const [showConfirm, setShowConfirm] = useState(false);
   const [branchDetails, setBranchDetails] = useState({});
   const [searchModalVisible, setSearchModalVisible] = useState(false);
-  // eslint-disable-next-line no-unused-vars
-  const [filteredBranches, setFilteredBranches] = useState([]);
+  // const [filteredBranches, setFilteredBranches] = useState([]);
   const [form] = Form.useForm();
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
@@ -29,7 +27,7 @@ const [showConfirm, setShowConfirm] = useState(false);
   // 🧹 Delete branch
   const onDelete = async (record) => {
     try {
-      setDeleteLoader(true);
+      // setDeleteLoader(true);
       const response = await DELETE(`${ADD_BRANCH}${record.id}/`);
 
       if (response?.status === 200) {
@@ -52,8 +50,8 @@ const [showConfirm, setShowConfirm] = useState(false);
         description: "An error occurred while deleting the branch.",
       });
     } finally {
-      setDeleteLoader(false);
-      setShowConfirm(false);
+      // setDeleteLoader(false);
+      // setShowConfirm(false);
     }
   };
 
@@ -417,7 +415,7 @@ const [showConfirm, setShowConfirm] = useState(false);
                 const value = e.target.value.trim();
                 if (value === "") {
                   // 🧹 Reset when cleared
-                  setFilteredBranches([]);
+                  // setFilteredBranches([]);
                   getBranchesList(); // reload all branches
                 }
               }}
