@@ -34,7 +34,7 @@ const AddArea = () => {
     if (params.id) {
       getAreaDetails();
     }
-  }, [params.id]);
+  }, [params.id,getAreaDetails]);
 
   const getAreaDetails = async () => {
     try {

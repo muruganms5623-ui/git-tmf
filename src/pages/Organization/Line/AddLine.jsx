@@ -33,7 +33,7 @@ const AddLine = () => {
     if (params.id) {
       getLineDetails();
     }
-  }, [params.id,getLineDetails]);
+  }, [params.id]);
 
   const getLineDetails = useCallback(async () => {
     try {

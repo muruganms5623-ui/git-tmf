@@ -10,9 +10,9 @@ const OrgSettings = () => {
     const { Title } = Typography;
 
     const [form] = Form.useForm();
-    useEffect(() => {
+    useEffect(() => {   
         getOrgSettings();
-    }, [getOrgSettings]);
+    });
   const getOrgSettings = useCallback(async () => {
         try {
             const response = await GET(SETTINGS);

@@ -79,7 +79,7 @@ const Auth_lock_Screen = () => {
 			document.removeEventListener('touchmove', handleTouchMove);
 			document.removeEventListener('touchend', handleTouchEnd);
 		};
-	}, [isDragging, sliderValue, isUnlocked]);
+	}, [isDragging, sliderValue, isUnlocked,handleEnd,handleMove]);
 	const [currentTime, setCurrentTime] = useState(new Date());
 
 	useEffect(() => {

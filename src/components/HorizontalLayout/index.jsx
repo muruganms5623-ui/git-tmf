@@ -89,7 +89,7 @@ const Layout = (props) => {
       document.getElementById("preloader").style.display = "none";
       document.getElementById("status").style.display = "none";
     }
-  }, [isPreloader]);
+  }, [isPreloader,hideRightbar]);
 
   useEffect(() => {
     if (layoutModeType) {
