@@ -14,8 +14,8 @@ const ExpenseTypeList = () => {
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState("");
   const [expandedKey, setExpandedKey] = useState(null);
-  const [_deleteLoader, setDeleteLoader] = useState(false);
-  const [_showConfirm, setShowConfirm] = useState(false);
+  // const [deleteLoader, setDeleteLoader] = useState(false);
+  // const [showConfirm, setShowConfirm] = useState(false);
   const [api, contextHolder] = notification.useNotification();
   const [showOnlyActive, setShowOnlyActive] = useState(true);
 
@@ -94,7 +94,7 @@ const ExpenseTypeList = () => {
 
   const onDelete = async (record) => {
     try {
-      setDeleteLoader(true);
+      // setDeleteLoader(true);
       const response = await DELETE(`/api/expensetypes/${record.id}/`);
       if (response?.status === 204) {
         const updatedData = tableData.filter((item) => item.id !== record.id);
@@ -120,8 +120,8 @@ const ExpenseTypeList = () => {
         duration: 0,
       });
     } finally {
-      setDeleteLoader(false);
-      setShowConfirm(false);
+      // setDeleteLoader(false);
+      // setShowConfirm(false);
     }
   };
 
