@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useCallback } from "react";
 import { Button, notification, FloatButton, Form, Input, Modal, Avatar, List, Skeleton, Divider, Menu, Dropdown, Popconfirm } from "antd";
 import { PlusOutlined, ReloadOutlined, SearchOutlined, ExclamationCircleOutlined, DeleteFilled, EllipsisOutlined } from "@ant-design/icons";
@@ -11,15 +12,15 @@ import { useNavigate } from "react-router-dom";
 import branchIcon from "assets/images/location.png";
 import SwipeablePanel from "components/Common/SwipeablePanel";
 
+
 const ListBranch = () => {
   const [loading, setLoading] = useState(false);
   const [branches, setBranches] = useState([]);
-  
-  // const [deleteLoader, setDeleteLoader] = useState(false);
-  // const [showConfirm, setShowConfirm] = useState(false);
+  const [deleteLoader, setDeleteLoader] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [branchDetails, setBranchDetails] = useState({});
   const [searchModalVisible, setSearchModalVisible] = useState(false);
-  // const [filteredBranches, setFilteredBranches] = useState([]);
+  const [filteredBranches, setFilteredBranches] = useState([]);
   const [form] = Form.useForm();
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
@@ -27,8 +28,8 @@ const ListBranch = () => {
   // 🧹 Delete branch
   const onDelete = async (record) => {
     try {
-      // setDeleteLoader(true);
-      const response = await DELETE(`${ADD_BRANCH}${record.id}/`);
+      setDeleteLoader(true);
+      const response = await DELETE(`${ADD_BRANCH}${record.id}`);
 
       if (response?.status === 200) {
         setBranches((prev) => prev.filter((item) => item.id !== record.id));
@@ -50,8 +51,8 @@ const ListBranch = () => {
         description: "An error occurred while deleting the branch.",
       });
     } finally {
-      // setDeleteLoader(false);
-      // setShowConfirm(false);
+      setDeleteLoader(false);
+      setShowConfirm(false);
     }
   };
 
@@ -318,7 +319,7 @@ const ListBranch = () => {
         key={branch.id}
         style={{
           borderBottom: "2px solid #f0f0f0",
-          padding: "8px 0px",
+          padding: "0px 0px",
           marginLeft: "-10px",
           marginRight: "-10px",
         }}
@@ -345,44 +346,48 @@ const ListBranch = () => {
 ) : (
   // 💻 DESKTOP VIEW
   <>
-    <List.Item
-      onClick={() => handleAction(branch)}
-      style={{
-        cursor: "pointer",
-        background: isExpanded ? "#f9f9f9" : "#fff",
-      }}
-    >
-      <List.Item.Meta
-        avatar={<Avatar src={branchIcon} />}
-        title={
-          <div
+   <List.Item
+  style={{
+    background: isExpanded ? "#f9f9f9" : "#fff",
+    cursor: "default", // not clickable on whole item
+  }}
+>
+  <List.Item.Meta
+    avatar={<Avatar src={branchIcon} />}
+    title={
+      <div
+        onClick={() => handleAction(branch)} // ✅ only header is clickable
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          width: "100%",
+          cursor: "pointer",
+          padding: "6px 0",
+        }}
+      >
+        <span style={{ fontWeight: 600, color: "black" }}>
+          {branch.branch_name}
+        </span>
+        <Dropdown overlay={renderMenu(branch)} trigger={["click"]}>
+          <EllipsisOutlined
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              width: "100%",
+              fontSize: "22px",
+              color: "#999",
+              cursor: "pointer",
             }}
-          >
-            <span style={{ fontWeight: 600, color: "#1677ff" }}>
-              {branch.branch_name}
-            </span>
-            <Dropdown overlay={renderMenu(branch)} trigger={["click"]}>
-              <EllipsisOutlined
-                style={{
-                  fontSize: "22px",
-                  color: "#999",
-                  cursor: "pointer",
-                }}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </Dropdown>
-          </div>
-        }
-      />
-    </List.Item>
+            onClick={(e) => e.stopPropagation()}
+          />
+        </Dropdown>
+      </div>
+    }
+  />
+</List.Item>
+
 
     {isExpanded && details && (
-      <div style={{ marginTop: 6 }}>
+      <div style={{ marginTop: 6 }}
+     >
         <BranchCollapseContent branch={branch} details={details} />
       </div>
     )}
@@ -415,7 +420,7 @@ const ListBranch = () => {
                 const value = e.target.value.trim();
                 if (value === "") {
                   // 🧹 Reset when cleared
-                  // setFilteredBranches([]);
+                  setFilteredBranches([]);
                   getBranchesList(); // reload all branches
                 }
               }}
