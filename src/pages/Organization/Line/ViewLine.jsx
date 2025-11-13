@@ -5,19 +5,22 @@ import { Button, Flex, notification, Grid,  List,
   Skeleton,
   Avatar,
   Dropdown,
-  Menu } from "antd";
+  Menu,Select,Modal } from "antd";
 import Table from "../../../components/Common/Table";
 import { GET, DELETE, POST } from "helpers/api_helper";
 import { LINE, SEARCH, COLUMNCHANGE, SELECTEDCOLUMN } from "helpers/url_helper";
 import Loader from "components/Common/Loader";
 import ColumnDropdown from "../../../components/Common/ColumnDropdown";
-import CommonSearch from "components/Common/Search";
-import { debounce } from "lodash";
+// import CommonSearch from "components/Common/Search";
+// import { debounce } from "lodash";
 import SwipeablePanel from "components/Common/SwipeablePanel";
-import { EllipsisOutlined } from "@ant-design/icons";
+import { EllipsisOutlined,SearchOutlined,ReloadOutlined,PlusOutlined } from "@ant-design/icons";
 import InfiniteScroll from "react-infinite-scroll-component";
 import LineCollapseContent from "components/Common/LineCollapseContent";
-import { Switch } from "antd";
+import { Switch,FloatButton } from "antd";
+import reorderIcon from "../../../assets/up-and-down-arrow.png";
+
+
 
 let header = [
   {
@@ -73,6 +76,13 @@ const ViewLine = () => {
   });
   const [selectedColumn, setSelectedColumn] = useState([]);
 const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
+const [branchModalVisible, setBranchModalVisible] = useState(false);
+const [selectedBranch, setSelectedBranch] = useState(null);
+const [branchOptions, setBranchOptions] = useState([]);
+const [originalData, setOriginalData] = useState([]); // ✅ store full data
+const [searchModalVisible, setSearchModalVisible] = useState(false);
+const [searchText, setSearchText] = useState("");
+const [showReset, setShowReset] = useState(false);
 
 
   const { useBreakpoint } = Grid;
@@ -112,11 +122,13 @@ const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
         setTableData(reorderedData);
         setReorder(false);
         setRowReorderred(false);
+        console.log(rowReorderred);
         const filtered = header.filter(
           (item) => !["move", "order"].includes(item.value)
         );
         setTableHeader(filtered);
         setOrder({});
+        setShowReset(true);
         api.success({
           message: "Re-Ordered",
           description: "The order has been updated successfully. ",
@@ -138,48 +150,70 @@ const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
       });
     }
   };
+  const handleReset = () => {
+  setTableData(originalData);
+  setShowReset(false);
+  setSelectedBranch(null); 
+  setSearchText("")
+  notification.success({
+    message: "Data Reset",
+    description: "Restored to the original order successfully.",
+  });
+};
 
-  const getLineList = async () => {
-    try {
-      setTableLoader(true);
-      const response = await GET(LINE);
-      if (response?.status === 200) {
-        console.log(response.data)
-        setTableData(response.data);
-        const filterCol = ["branch_name", "lineName"];
-        const uniqueOptions = {};
+
+const getLineList = async () => {
+  try {
+    setTableLoader(true);
+    const response = await GET(LINE);
+    if (response?.status === 200) {
+      setTableData(response.data);
+      setOriginalData(response.data); // ✅ save full list here
+
+      const filterCol = ["branch_name", "lineName"];
+      const uniqueOptions = {};
+      filterCol.forEach((col) => {
+        uniqueOptions[col] = new Set();
+      });
+
+      response.data.forEach((item) => {
         filterCol.forEach((col) => {
-          uniqueOptions[col] = new Set();
+          uniqueOptions[col].add(item[col]);
         });
-        response.data.forEach((item) => {
-          filterCol.forEach((col) => {
-            uniqueOptions[col].add(item[col]);
-          });
-        });
-        filterCol.forEach((col) => {
-          setFilterOption((prev) => {
-            return {
-              ...prev,
-              [col]: Array.from(uniqueOptions[col]).map((value) => ({
-                text: value,
-                value: value,
-              })),
-            };
-          });
-        });
-      } else {
-        setTableData([]);
-      }
-      setTableLoader(false);
-    } catch (error) {
-      setTableLoader(false);
+      });
+
+      filterCol.forEach((col) => {
+        setFilterOption((prev) => ({
+          ...prev,
+          [col]: Array.from(uniqueOptions[col]).map((value) => ({
+            text: value,
+            value: value,
+          })),
+        }));
+      });
+
+      // Populate branch list
+      const uniqueBranches = [
+        ...new Set(response.data.map((item) => item.branch_name)),
+      ];
+      setBranchOptions(uniqueBranches.map((b) => ({ label: b, value: b })));
+    } else {
       setTableData([]);
+      setOriginalData([]);
     }
-  };
+  } catch (error) {
+    setTableData([]);
+    setOriginalData([]);
+  } finally {
+    setTableLoader(false);
+  }
+};
+
 
   const clickReorder = () => {
-    setReorder(true);
-    console.log(tableHeader);
+     setBranchModalVisible(true);
+    
+    console.log(tableHeader)
     setTableHeader((prev) => {
       return [
         { label: "Move", value: "move" },
@@ -200,13 +234,16 @@ const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
     setRowReorderred(true);
   };
 
-  const handleCancel = () => {
-    const filtered = header.filter(
-      (item) => !["move", "order"].includes(item.value)
-    );
-    setTableHeader(filtered);
-    setReorder(false);
-  };
+ const handleCancel = () => {
+  const filtered = header.filter(
+    (item) => !["move", "order"].includes(item.value)
+  );
+  setTableHeader(filtered);
+  setReorder(false);
+  setSelectedBranch(null);
+  setTableData(originalData); // ✅ restore full data
+};
+
 
   const onDelete = async (record) => {
     try {
@@ -239,27 +276,45 @@ const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
       });
     }
   };
-  const debouncedSearch = debounce(async (searchedvalue) => {
-    setTableLoader(true);
-    try {
-      const response = await GET(
-        `${SEARCH}?module=line&&searchText=${searchedvalue}`
-      );
-      if (response?.status === 200) {
-        setTableLoader(false);
-        setTableData(response?.data);
-      } else {
-        setTableLoader(false);
-        api.error({
-          message: "Error",
-          description: "No Line Found",
-        });
-      }
-    } catch (error) {
-      setTableLoader(false);
-      throw error;
-    }
-  }, 700);
+// const debouncedSearch = debounce(async (searchedvalue) => {
+//   setTableLoader(true);
+//   try {
+//     const response = await GET(`${SEARCH}?module=line&&searchText=${searchedvalue}`);
+//     if (response?.status === 200) {
+//       const data = response.data || [];
+
+//       // ✅ Update main data list
+//       setTableData(data);
+
+//       // ✅ Optionally update backup/original data
+//       setOriginalData(data);
+
+//       // ✅ Rebuild branch options (still useful)
+//       const uniqueBranches = [...new Set(data.map((item) => item.branch_name))];
+//       setBranchOptions(uniqueBranches.map((b) => ({ label: b, value: b })));
+
+//       setTableLoader(false);
+//       if (data.length === 0) {
+//         api.warning({
+//           message: "No Results",
+//           description: `No lines found for "${searchedvalue}".`,
+//         });
+//       }
+//     } else {
+//       setTableLoader(false);
+//       api.error({
+//         message: "Error",
+//         description: "No Line Found",
+//       });
+//     }
+//   } catch (error) {
+//     setTableLoader(false);
+//     api.error({
+//       message: "Error",
+//       description: "Search failed. Please try again.",
+//     });
+//   }
+// }, 700);
 
   const handleColumnChange = async (value) => {
     try {
@@ -297,52 +352,191 @@ const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
     }));
   };
 
+const handleBranchSubmit = () => {
+  if (!selectedBranch) {
+    notification.warning({
+      message: "Select a Branch",
+      description: "Please choose a branch before continuing.",
+    });
+    return;
+  }
+
+  // ✅ Filter data temporarily
+  const filteredData = originalData.filter(
+    (item) => item.branch_name === selectedBranch
+  );
+
+  setTableData(filteredData);
+
+  setBranchModalVisible(false);
+  setReorder(true);
+  setTableHeader((prev) => [
+    { label: "Move", value: "move" },
+    { label: "Order", value: "order" },
+    ...prev,
+  ]);
+};
+const handleSearch = () => {
+  const query = searchText.trim().toLowerCase();
+
+  if (!query) {
+    // ✅ if empty, reset to full data
+    setTableData(originalData);
+    setSearchModalVisible(false);
+    notification.info({
+      message: "Reset Search",
+      description: "Showing all lines again.",
+    });
+    return;
+  }
+
+  // ✅ Filter from originalData with partial + case-insensitive match
+  const filtered = originalData.filter((item) => {
+    const lineName = (item.lineName || "").toLowerCase();
+    const branch = (item.branchName || "").toLowerCase();
+    const lineType = (item.lineType || "").toLowerCase();
+
+    // ✅ Match if query is part of lineName, branch, or lineType
+    return (
+      lineName.includes(query) ||
+      branch.includes(query) ||
+      lineType.includes(query)
+    );
+  });
+
+  setTableData(filtered);
+  setSearchModalVisible(false);
+setShowReset(true);
+  if (filtered.length === 0) {
+    notification.warning({
+      message: "No Results",
+      description: `No matches found for "${searchText}".`,
+    });
+  } else {
+    notification.success({
+      message: "Search Complete",
+      description: `${filtered.length} result(s) found for "${searchText}".`,
+    });
+  }
+};
+
+
+// Branch selection modal
+const branchSelectionModal = (
+  <Modal
+    title="Select Branch for Re-Ordering"
+    open={branchModalVisible}
+    onOk={handleBranchSubmit}
+    onCancel={() => setBranchModalVisible(false)}
+    okText="Continue"
+  >
+    <p style={{ marginBottom: 10 }}>Choose a branch to view its line list:</p>
+    <Select
+      style={{ width: "100%" }}
+      placeholder="Select Branch"
+      options={branchOptions}
+      value={selectedBranch}
+      onChange={setSelectedBranch}
+      showSearch
+      optionFilterProp="label"
+    />
+  </Modal>
+);
+const searchModal = (
+ <Modal
+    title={<div style={{ textAlign: "center", width: "100%" }}>Search Line</div>}
+    open={searchModalVisible}
+    onOk={handleSearch}
+    onCancel={() => setSearchModalVisible(false)}
+    okText="Search">
+
+    <p style={{ marginBottom: 10 ,fontWeight: 500 }}>Line Name </p>
+    <input
+      type="text"
+      value={searchText}
+      onChange={(e) => setSearchText(e.target.value)}
+      placeholder="Enter line name to search"
+      style={{
+        width: "100%",
+        padding: "8px 10px",
+        borderRadius: "6px",
+        border: "1px solid #d9d9d9",
+        outline: "none",
+      }}
+    />
+  </Modal>
+);
+
+
+
   const handleEditLine = (line) => navigate(`/line/edit/${line.id}`);
   return (
-    <div className="page-content">
+    <div className="page-content"style={{ paddingTop: 0, marginTop: 0 }}>
+<div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 0,
+    marginBottom: "10px",
+  }}
+>
+  <h2 style={{ fontSize: "24px", fontWeight: 600, margin: 0 }}>All Lines</h2>
+
+  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+    {!reOrder && (
+      <>
+        <Button
+          
+          onClick={clickReorder}
+          disabled={reOrder}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            width: "32px"
+          }}
+        >
+          <img
+            src={reorderIcon}
+            alt="Reorder Icon"
+            style={{ width: "16px", height: "16px" }}
+          />
+        </Button>
+         {/* ✅ Reset button shown only after reorder submit */}
+        {showReset && (
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={handleReset}
+            title="Reset to Original"
+          />
+        )}
+
+        {/* ✅ Search button now beside reorder */}
+        <Button
+          icon={<SearchOutlined />}
+          onClick={() => setSearchModalVisible(true)}
+          type="default"
+        >
+         {!isMobile && "Search"} 
+        </Button>
+
+       
+      </>
+    )}
+  </div>
+</div>
+
+
+
+    {branchSelectionModal}
+{searchModal}
+
       {tableLoader && <Loader />}
       {contextHolder}
       <Flex justify="space-between" wrap="wrap">
-        <Flex gap="middle" wrap="wrap">
-          <Button
-            className="mb-3 d-flex align-items-center"
-            type="primary"
-            onClick={clickReorder}
-            disabled={reOrder}
-          >
-            Re-Order
-          </Button>
-          {rowReorderred && (
-            <Button
-              className="mb-3 d-flex align-items-center"
-              type="primary"
-              onClick={SumbitReorder}
-              loading={reorderLoader}
-              disabled={reorderLoader}
-            >
-              Submit
-            </Button>
-          )}
-
-          {reOrder && (
-            <Button
-              className="mb-3 d-flex align-items-center"
-              onClick={handleCancel}
-            >
-              Cancel
-            </Button>
-          )}
-        </Flex>
-        <Flex>
-          <CommonSearch
-            placeholder="Search by Line Name"
-            size="medium"
-            allowClear
-            onSearch={debouncedSearch}
-            loading={tableLoader}
-            onEmptySearch={getLineList}
-          />
-        </Flex>
+        
+        
 
         <Flex gap="middle">
           {!isMobile && (
@@ -355,14 +549,7 @@ const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
               selectedColumn={selectedColumn}
             />
           )}
-          <Button
-            className="mb-3 d-flex align-items-center"
-            type="primary"
-            onClick={() => navigate("/line/add")}
-          >
-            <span className="mdi mdi-plus" />
-            Add Line
-          </Button>
+         
         </Flex>
       </Flex>
 
@@ -419,15 +606,27 @@ const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
         />
       )} */}
 
-{reOrder ? (
+{reOrder && !branchModalVisible ? (
   <div>
     {/* Switch Toggle */}
+    {selectedBranch && (
+      <h3
+        style={{
+          fontSize: "18px",
+          fontWeight: "600",
+          marginBottom: "10px",
+          color: "#1677ff",
+        }}
+      >
+        Reordering for Branch: {selectedBranch}
+      </h3>
+    )}
     <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-      <span style={{ marginRight: 8, fontWeight: 500 }}>Enable Drag & Drop</span>
+      
       <Switch
         checked={isDragMode}
         onChange={(checked) => setIsDragMode(checked)}
-      />
+      /><span style={{ marginRight: 8, fontWeight: 500 }}>Slide</span>
     </div>
 
     {/* Separate table for desktop and mobile */}
@@ -501,15 +700,16 @@ const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
   <div
     id="scrollableDiv"
     style={{
-      height: 500,
+
+      height: 400,
       overflow: "auto",
       padding: 0,
-      margin: 0,
+      marginTop: 20,
     }}
   >
     <InfiniteScroll
       dataLength={tableData.length}
-      style={{ padding: "0 18px" }}
+      style={{ padding: "0 10px" }}
       next={getLineList}
       hasMore={false}
       loader={<Skeleton avatar paragraph={{ rows: 1 }} active />}
@@ -533,7 +733,7 @@ const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
             >
               {isMobile ? (
                 // 📱 MOBILE VIEW
-                <div style={{ marginLeft: "-10px", padding: 0 }}>
+                <div style={{ marginLeft: "-10px", padding:0 }}>
                   <SwipeablePanel
                     item={{
                       ...line,
@@ -627,6 +827,21 @@ const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
       />
     </InfiniteScroll>
   </div>
+)}
+{!reOrder && (
+  <FloatButton
+    icon={<PlusOutlined />}
+    type="primary"
+    tooltip={<div>Add New Line</div>}
+    onClick={() => navigate("/line/add")}
+    style={{
+        right: 24,
+          bottom: 24,
+          width: 56,
+          height: 56,
+          position: "fixed", // ✅ prevents scroll-triggered shift
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",}}
+  />
 )}
 
 
