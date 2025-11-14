@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
-import { Form, Input, Button, Select, notification } from "antd";
+import { Form, Input, Button, Select, notification,Divider,Space } from "antd";
 import { ToastContainer } from "react-toastify";
 import Loader from "components/Common/Loader";
 import { LINE, ADD_BRANCH } from "helpers/url_helper";
 import { POST, GET } from "helpers/api_helper";
 import { useParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeftOutlined, ReloadOutlined } from "@ant-design/icons";
+// import { ArrowLeftOutlined, ReloadOutlined } from "@ant-design/icons";
 
 const { Option } = Select;
 
@@ -29,29 +29,30 @@ const AddLine = () => {
     getBranchList();
   }, []);
 
-  useEffect(() => {
-    if (params.id) {
-      getLineDetails();
-    }
-  });
-
-  const getLineDetails = useCallback(async () => {
-    try {
-      setLoader(true);
-      const response = await GET(`${LINE}${params.id}`);
-      if (response?.status === 200) {
-        setFormData(response?.data || []);
-        form.setFieldsValue(response?.data);
-      } else {
-        setFormData([]);
-      }
-      setLoader(false);
-    } catch (error) {
+ const getLineDetails = useCallback(async () => {
+  try {
+    setLoader(true);
+    const response = await GET(`${LINE}${params.id}`);
+    if (response?.status === 200) {
+      setFormData(response?.data || []);
+      form.setFieldsValue(response?.data);
+    } else {
       setFormData([]);
-      setLoader(false);
-      console.log(error);
     }
+    setLoader(false);
+  } catch (error) {
+    setFormData([]);
+    setLoader(false);
+    console.log(error);
+  }
 }, [params.id, form]);
+
+useEffect(() => {
+  if (params.id) {
+    getLineDetails();
+  }
+}, [params.id, getLineDetails]);
+
 
   const getBranchList = async () => {
     try {
@@ -125,22 +126,22 @@ const AddLine = () => {
     setFormData({ ...formData, ...allValues });
   };
 
-  const resetForm = () => {
-    setFormData({
-      lineName: "",
-      lineType: "",
-      branch: "",
-      installment: null,
-      badinstallment: null,
-    });
-    form.setFieldsValue({
-      lineName: "",
-      lineType: "",
-      branch: "",
-      installment: null,
-      badinstallment: null,
-    });
-  };
+  // const resetForm = () => {
+  //   setFormData({
+  //     lineName: "",
+  //     lineType: "",
+  //     branch: "",
+  //     installment: null,
+  //     badinstallment: null,
+  //   });
+  //   form.setFieldsValue({
+  //     lineName: "",
+  //     lineType: "",
+  //     branch: "",
+  //     installment: null,
+  //     badinstallment: null,
+  //   });
+  // };
 
   const options = [
     { label: "Daily", value: "daily" },
@@ -148,55 +149,72 @@ const AddLine = () => {
     { label: "Monthly", value: "monthly" },
   ];
 
-  const isFormEmpty = () => {
-    return (
-      !formData.lineName &&
-      !formData.lineType &&
-      !formData.branch &&
-      !formData.installment &&
-      !formData.badinstallment
-    );
-  };
+  // const isFormEmpty = () => {
+  //   return (
+  //     !formData.lineName &&
+  //     !formData.lineType &&
+  //     !formData.branch &&
+  //     !formData.installment &&
+  //     !formData.badinstallment
+  //   );
+  // };
 
   return (
-    <>
+      <>
       {loader && <Loader />}
 
-      <div className="page-content">
-        <div className="cursor-pointer back-icon">
-          <span onClick={() => navigate("/line")}>
-            <ArrowLeftOutlined /> Back
-          </span>
-        </div>
-
+      <div
+        className="page-content"
+        style={{
+          marginRight: "10px",
+          marginLeft: "-10px",
+          maxWidth: "100%",
+        }}
+      >
         <div
           className="container-fluid"
-          style={{ paddingTop: params?.id ? "25px" : "" }}
+          style={{
+            marginTop: -100,
+            padding: 0,
+          }}
         >
           <div className="row">
             <div className="col-md-12">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h5>Line Details</h5>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginBottom: "20px",
+                  gap: "10px",
+                }}
+              >
+                {/* <ArrowLeftOutlined
+                  onClick={() => navigate("/line")}
+                  style={{ cursor: "pointer", fontSize: "18px" }}
+                /> */}
+                <h2 style={{ margin: 0, fontSize: "24px", fontWeight: 600 }}>
+                  {params.id ? "Edit Line" : "Add Line"}
+                </h2>
               </div>
+
               <Form
                 form={form}
-                onFinish={onFinish}
                 layout="vertical"
+                onFinish={onFinish}
                 onValuesChange={onValuesChange}
                 initialValues={formData}
+                style={{ padding: 0, marginRight: "-20px", marginBottom: "-30px" }}
               >
-                <div className="card p-4 shadow-sm">
-                  <div className="row mb-3">
+                <div className="container" style={{ padding: 0 }}>
+                 
+
+                  {/* Branch and Line Name */}
+                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
                         label="Branch"
                         name="branch"
-                        rules={[
-                          {
-                            required: true,
-                            message: "This field is required!",
-                          },
-                        ]}
+                        rules={[{ required: true, message: "Branch is required" }]}
                       >
                         <Select
                           placeholder="Select Branch"
@@ -205,41 +223,33 @@ const AddLine = () => {
                           size="large"
                           loading={branchLoader}
                         >
-                          {branchList?.map((branch) => (
-                            <Option key={branch?.id} value={branch?.id}>
-                              {branch?.branch_name}
+                          {branchList.map((branch) => (
+                            <Option key={branch.id} value={branch.id}>
+                              {branch.branch_name}
                             </Option>
                           ))}
                         </Select>
                       </Form.Item>
                     </div>
+
                     <div className="col-md-6">
                       <Form.Item
                         label="Line Name"
                         name="lineName"
-                        rules={[
-                          {
-                            required: true,
-                            message: "This field is required!",
-                          },
-                        ]}
+                        rules={[{ required: true, message: "Line Name is required" }]}
                       >
-                        <Input placeholder="Enter the line Name" size="large" />
+                        <Input placeholder="Enter line name" size="large" />
                       </Form.Item>
                     </div>
                   </div>
 
-                  <div className="row mb-3">
+                  {/* Line Type & Installment */}
+                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
                         label="Line Type"
                         name="lineType"
-                        rules={[
-                          {
-                            required: true,
-                            message: "This field is required!",
-                          },
-                        ]}
+                        rules={[{ required: true, message: "Line Type is required" }]}
                       >
                         <Select placeholder="Select Line Type" size="large">
                           {options.map((option) => (
@@ -250,68 +260,79 @@ const AddLine = () => {
                         </Select>
                       </Form.Item>
                     </div>
+
                     <div className="col-md-6">
                       <Form.Item
                         label="Installment"
                         name="installment"
                         rules={[
-                          {
-                            required: true,
-                            message: "This field is required!",
-                          },
+                          { required: true, message: "Installment is required" },
                         ]}
                       >
                         <Input
                           type="number"
-                          placeholder="Enter the no of installment"
+                          placeholder="Enter number of installments"
                           size="large"
                         />
                       </Form.Item>
                     </div>
                   </div>
 
-                  <div className="row">
+                  {/* Bad Installment */}
+                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
-                        label="No of Bad Installment"
+                        label="No. of Bad Installments"
                         name="badinstallment"
                         rules={[
                           {
                             required: true,
-                            message: "This field is required!",
+                            message: "No of bad installments is required",
                           },
                         ]}
                       >
                         <Input
                           type="number"
-                          placeholder="Enter the no of bad installment"
+                          placeholder="Enter bad installment count"
                           size="large"
                         />
                       </Form.Item>
                     </div>
                   </div>
 
-                  <div className="d-flex justify-content-center mt-4">
-                    <Button type="primary" htmlType="submit" className="me-3">
-                      {params.id ? "Update" : "Submit"}
-                    </Button>
-                    {!isFormEmpty() && (
-                      <Button
-                        type="default"
-                        icon={<ReloadOutlined />}
-                        onClick={resetForm}
-                        variant="solid"
-                        color="danger"
-                      >
-                        Reset
+                  <Divider style={{ borderTop: "2px solid #d9d9d9" }} />
+
+                  {/* Buttons */}
+                  <div className="text-center mt-4">
+                    <Space size="large">
+                      <Button type="primary" htmlType="submit" size="large">
+                        {params.id ? "Update Line" : "Add Line"}
                       </Button>
-                    )}
+
+                      {/* {!isFormEmpty() && (
+                        <Button
+                          size="large"
+                          onClick={resetForm}
+                          icon={<ReloadOutlined />}
+                        >
+                          Reset
+                        </Button>
+                      )} */}
+
+                      <Button
+                        size="large"
+                        onClick={() => navigate("/line")}
+                      >
+                        Cancel
+                      </Button>
+                    </Space>
                   </div>
                 </div>
               </Form>
             </div>
           </div>
         </div>
+
         <ToastContainer />
       </div>
     </>
