@@ -325,6 +325,8 @@ const ViewLine = () => {
 
   const handleLineAction = (branchName, lineId) => {
     const key = `${branchName}-${lineId}`;
+    // Close any open swipe first
+    setOpenSwipeId(null);
     setExpandedLines((prev) => {
       // Close all other lines, keep only the clicked one
       return {
@@ -333,10 +335,23 @@ const ViewLine = () => {
     });
   };
 
-  const handleSwipeStateChange = (itemId, direction) => {
-    // Close any previously open swipe when a new one opens
-    if (itemId !== openSwipeId) {
-      setOpenSwipeId(itemId);
+  const handleSwipeStateChange = (lineId, isOpen) => {
+    // When a swipe opens, set it as the currently open one (this closes all others)
+    // When a swipe closes, only clear if it's the currently open one
+    if (isOpen) {
+      setOpenSwipeId(lineId);
+    } else if (openSwipeId === lineId) {
+      setOpenSwipeId(null);
+    }
+  };
+
+  // NEW: Handle branch collapse change
+  const handleBranchChange = (keys) => {
+    setExpandedBranches(keys);
+    // When collapsing a branch (keys becomes empty or reduces), close all expanded lines
+    if (keys.length === 0 || keys.length < expandedBranches.length) {
+      setExpandedLines({});
+      setOpenSwipeId(null);
     }
   };
 
@@ -566,7 +581,7 @@ const ViewLine = () => {
                 : [
                     
                     { label: "S.No", value: "index" },
-                    { label: "Order", value: "order" },
+                    { label: "Reorder", value: "order" },
                     { label: "Line Name", value: "lineName" },
                   ]
             }
@@ -597,7 +612,7 @@ const ViewLine = () => {
         <div
           id="scrollableDiv"
           style={{
-            height: 400,
+            height: 500,
             overflow: "auto",
             padding: 0,
             marginTop: 20,
@@ -606,7 +621,7 @@ const ViewLine = () => {
           <Collapse
             accordion={true}
             activeKey={expandedBranches}
-            onChange={setExpandedBranches}
+            onChange={handleBranchChange}
             style={{ 
               background: "#fff",
               border: "none"
@@ -672,9 +687,15 @@ const ViewLine = () => {
                               name="line"
                               avatarSrc={lineIcon}
                               onSwipeRight={
-                                !isExpanded ? () => handleEditLine(line) : undefined
+                                !isExpanded ? () => {
+                                  setOpenSwipeId(null);
+                                  handleEditLine(line);
+                                } : undefined
                               }
-                              onSwipeLeft={!isExpanded ? () => onDelete(line) : undefined}
+                              onSwipeLeft={!isExpanded ? () => {
+                                setOpenSwipeId(null);
+                                onDelete(line);
+                              } : undefined}
                               isExpanded={isExpanded}
                               onExpandToggle={() => {
                                 setOpenSwipeId(null); // Close any open swipe first
@@ -682,7 +703,7 @@ const ViewLine = () => {
                               }}
                               renderContent={() => <LineCollapseContent line={line} />}
                               isSwipeOpen={openSwipeId === line.id}
-                              onSwipeStateChange={handleSwipeStateChange}
+                              onSwipeStateChange={(isOpen) => handleSwipeStateChange(line.id, isOpen)}
                             />
                           </div>
                         ) : (
