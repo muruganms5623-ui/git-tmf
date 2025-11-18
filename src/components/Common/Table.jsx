@@ -20,10 +20,10 @@ import { useNavigate } from "react-router-dom";
 import dragIcon from "../../assets/drag.png";
 
 const RowContext = React.createContext({});
-
+const GHOST_ID = "ghost-row-bottom";
 
 /* ----------------------------------------------------------
-    ⭐ FIXED: DRAGGABLE ROW — NO FLICKER, NO JUMPING 
+    ⭐ DRAGGABLE ROW — NO FLICKER, NO JUMPING
 ------------------------------------------------------------ */
 const DraggableBodyRow = ({ style, rowIndex, total, ...restProps }) => {
   const {
@@ -38,21 +38,22 @@ const DraggableBodyRow = ({ style, rowIndex, total, ...restProps }) => {
     animateLayoutChanges: () => false,
   });
 
+  // Prevent transform beyond allowed bounds for first/last rows
   let safeTransform = transform;
-
   if (isDragging && transform) {
     const y = transform.y;
-
-    // ⭐ Block dragging above the first row
+    // Block dragging above the first row
     if (rowIndex === 0 && y < 0) {
       safeTransform = { x: 0, y: 0 };
     }
-
-    // ⭐ Block dragging below the last row
+    // Block dragging below the last row
     if (rowIndex === total - 1 && y > 0) {
       safeTransform = { x: 0, y: 0 };
     }
   }
+
+  // preserve className provided by AntD (for rowClassName), add dragging class when dragging
+  const className = `${restProps.className ?? ""} ${isDragging ? "dragging-row" : ""}`;
 
   return (
     <RowContext.Provider
@@ -64,23 +65,23 @@ const DraggableBodyRow = ({ style, rowIndex, total, ...restProps }) => {
       <tr
         ref={setNodeRef}
         {...restProps}
+        className={className}
         style={{
           ...style,
           transform: safeTransform ? CSS.Transform.toString(safeTransform) : undefined,
           transition,
           position: isDragging ? "relative" : undefined,
           zIndex: isDragging ? 999 : undefined,
+          // subtle background to make dragging row visible (also controlled by .dragging-row)
+          background: isDragging ? undefined : undefined,
         }}
       />
     </RowContext.Provider>
   );
 };
 
-
-
-
 /* ----------------------------------------------------------
-    ⭐ FIXED DRAG HANDLE — No AntD Button, No Re-render Issues
+    ⭐ DRAG HANDLE — lightweight, no re-render issues
 ------------------------------------------------------------ */
 const DragHandle = () => {
   const { setActivatorNodeRef, listeners } = useContext(RowContext);
@@ -98,13 +99,12 @@ const DragHandle = () => {
         alignItems: "center",
         justifyContent: "center",
       }}
-      onClick={(e) => e.stopPropagation()} // ⭐ prevent row click during drag
+      onClick={(e) => e.stopPropagation()} // prevent row click during drag
     >
-      <img src={dragIcon} style={{ width: 14, height: 14, opacity: 0.8 }} alt="img" />
+      <img src={dragIcon} style={{ width: 14, height: 14, opacity: 0.8 }} alt="drag" />
     </div>
   );
 };
-
 
 const TableList = ({
   data,
@@ -117,85 +117,100 @@ const TableList = ({
   onDelete,
   name,
 }) => {
-  const [tableData, setTableData] = useState(data);
+  const [tableData, setTableData] = useState(data ?? []);
   const navigate = useNavigate();
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
-    setTableData(data);
+    setTableData(data ?? []);
   }, [data]);
 
   /* ----------------------------------------------------------
-      ⭐ SENSORS (prevents accidental move on touch/click)
+      SENSORS (prevents accidental move on touch/click)
   ------------------------------------------------------------ */
- const sensors = useSensors(
-  useSensor(PointerSensor, {
-    activationConstraint: { distance: 4 }, // ⭐ avoid jitter on grab
-  }),
-  useSensor(TouchSensor, {
-    activationConstraint: {
-      delay: 120,
-      tolerance: 3,
-    },
-  })
-);
-
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 4 }, // avoid jitter on grab
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 120,
+        tolerance: 3,
+      },
+    })
+  );
 
   /* ----------------------------------------------------------
-      ⭐ FIXED: REAL DRAG END LOGIC
+      DRAG STATE & BOUNDS
   ------------------------------------------------------------ */
-
   const [isDragging, setIsDragging] = useState(false);
-const [limits, setLimits] = useState({ top: 0, bottom: 0 });
+  const [limits, setLimits] = useState({ top: 0, bottom: 0 });
 
-const onDragStart = (event) => {
-  const table = document.querySelector(".ant-table-body");
+  const onDragStart = (event) => {
+    setIsDragging(true);
+    const table = document.querySelector(".ant-table-body");
+    if (table) {
+      const rect = table.getBoundingClientRect();
+      setLimits({
+        top: rect.top,
+        bottom: rect.bottom,
+      });
+    }
+  };
 
-  if (table) {
-    const rect = table.getBoundingClientRect();
-    setLimits({
-      top: rect.top,
-      bottom: rect.bottom,
-    });
-  }
-};
+  const onDragMove = (event) => {
+    // defensive checks (some events won't have activatorEvent)
+    if (!event.activatorEvent) return;
 
-const onDragMove = (event) => {
-  if (!event.activatorEvent || !event.delta) return;
+    const pointerY = event.activatorEvent.clientY;
 
-  const pointerY = event.activatorEvent.clientY;
+    // Stop ABOVE first row
+    if (pointerY < limits.top + 10) {
+      // telling dnd-kit there's no valid over target prevents jumping/flicker
+      // NOTE: mutating event.over is tolerated here; it's a common pattern to block drop targets
+      // but we also protect in onDragEnd.
+      // eslint-disable-next-line no-param-reassign
+      event.over = null;
+      return;
+    }
 
-  // Stop ABOVE first row
-  if (pointerY < limits.top + 10) {
-    event.over = null;
-    event.delta.y = 0;
-    return;
-  }
+    // Stop BELOW last row
+    if (pointerY > limits.bottom - 10) {
+      // eslint-disable-next-line no-param-reassign
+      event.over = null;
+      return;
+    }
+  };
 
-  // Stop BELOW last row
-  if (pointerY > limits.bottom - 10) {
-    event.over = null;
-    event.delta.y = 0;
-    return;
-  }
-};
+  const onDragCancel = () => {
+    setIsDragging(false);
+  };
 
+  const onDragEnd = ({ active, over }) => {
+    setIsDragging(false);
 
-const onDragEnd = ({ active, over }) => {
-  if (!over) return; // ⭐ blocked by onDragMove → ignore
+    if (!over) return; // blocked by onDragMove or cancelled
 
-  const oldIndex = tableData.findIndex((i) => i.id === active.id);
-  const newIndex = tableData.findIndex((i) => i.id === over.id);
+    // If user dropped on ghost row, interpret as "place at end" (last index)
+    const oldIndex = tableData.findIndex((i) => i.id === active.id);
+    let newIndex;
+    if (over.id === GHOST_ID) {
+      // Place at the last position
+      newIndex = tableData.length - 1;
+    } else {
+      newIndex = tableData.findIndex((i) => i.id === over.id);
+    }
 
-  if (oldIndex === newIndex) return;
+    // if indices not found or same, do nothing
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
 
-  const reordered = arrayMove(tableData, oldIndex, newIndex);
-  setTableData(reordered);
-  handleDragEnd(reordered);
-};
+    // prevent invalid moves: e.g., trying to move above the first row or below the last row
+    if (newIndex < 0 || newIndex > tableData.length - 1) return;
 
-
-
+    const reordered = arrayMove(tableData, oldIndex, newIndex);
+    setTableData(reordered);
+    if (typeof handleDragEnd === "function") handleDragEnd(reordered);
+  };
 
   const keys = {
     area: "areaName",
@@ -205,7 +220,7 @@ const onDragEnd = ({ active, over }) => {
   };
 
   /* ----------------------------------------------------------
-      ⭐ COLUMNS (unchanged except move column)
+      COLUMNS (unchanged except move column)
   ------------------------------------------------------------ */
   const generateColumns = () =>
     Header.map((column) => ({
@@ -267,61 +282,101 @@ const onDragEnd = ({ active, over }) => {
     }));
 
   /* ----------------------------------------------------------
-      ⭐ FINAL JSX
+      GHOST ROW - invisible but provides a stable target at bottom
   ------------------------------------------------------------ */
+  const GhostRow = (props) => {
+    // props may be passed by AntD; ignore and render an empty row with appropriate height
+    return (
+      <tr data-row-key={GHOST_ID} className="ghost-row">
+        <td colSpan={Header.length} style={{ height: 40, padding: 0, border: "none" }} />
+      </tr>
+    );
+  };
+
+  /* ----------------------------------------------------------
+      FINAL JSX
+  ------------------------------------------------------------ */
+  // items for SortableContext: include ghost only while dragging (stable target)
+  const sortableItems = isDragging
+    ? [...tableData.map((i) => i.id), GHOST_ID]
+    : tableData.map((i) => i.id);
+
   return (
     <div>
+      {/* small CSS to keep this component self-contained */}
+      <style>{`
+        /* alternating rows */
+        .odd-row td { background-color: #fafafa !important; }
+         td { background-color: #ffffff !important; }
+
+        // /* dragging highlight */
+        // .dragging-row td { background-color: #e6f7ff !important; }
+
+        /* hover */
+        .ant-table-tbody > tr:hover > td { background-color: #1677ff !important;color: white }
+
+        /* ghost row invisible but occupies space */
+        .ghost-row td { background: transparent !important; height: 40px; }
+      `}</style>
+
       {contextHolder}
 
       {reOrder ? (
         <DndContext
           sensors={sensors}
           modifiers={[restrictToVerticalAxis]}
-onDragStart={onDragStart}
-            onDragMove={onDragMove}
+          onDragStart={onDragStart}
+          onDragMove={onDragMove}
           onDragEnd={onDragEnd}
+          onDragCancel={onDragCancel}
         >
-          <SortableContext
-            items={tableData.map((i) => i.id)}
-            strategy={verticalListSortingStrategy}
-          >
+          <SortableContext items={sortableItems} strategy={verticalListSortingStrategy}>
             <Table
-              dataSource={tableData}
+              dataSource={isDragging ? [...tableData, { id: GHOST_ID }] : tableData}
               columns={generateColumns()}
               rowKey="id"
               pagination={false}
               bordered
+              rowClassName={(_, index) => (index % 2 === 0 ? "even-row" : "odd-row")}
               components={{
-  body: {
-    row: (props) => {
-      const rowIndex = tableData.findIndex(
-        (r) => r.id === props["data-row-key"]
-      );
-      return <DraggableBodyRow {...props} rowIndex={rowIndex} total={tableData.length} />;
-    },
-  },
-}}
+                body: {
+                  row: (props) => {
+                    const id = props["data-row-key"];
+                    // render ghost row when present
+                    if (id === GHOST_ID) return <GhostRow {...props} />;
 
+                    const rowIndex = tableData.findIndex((r) => r.id === id);
+                    return (
+                      <DraggableBodyRow
+                        {...props}
+                        rowIndex={rowIndex}
+                        total={tableData.length}
+                      />
+                    );
+                  },
+                },
+              }}
               scroll={{ x: "100%" }}
             />
           </SortableContext>
         </DndContext>
       ) : (
         <div
-  style={{
-    height: isDragging ? "100%" : "auto",
-    overflow: "hidden",
-  }}
->
-        <Table
-          dataSource={tableData}
-          columns={generateColumns()}
-          rowKey="id"
-          pagination={false}
-          bordered
-          scroll={{ x: "100%" }}
-          loading={loader}
-        />
+          style={{
+            height: isDragging ? "100%" : "auto",
+            overflow: "hidden",
+          }}
+        >
+          <Table
+            dataSource={tableData}
+            columns={generateColumns()}
+            rowKey="id"
+            pagination={false}
+            bordered
+            rowClassName={(_, index) => (index % 2 === 0 ? "even-row" : "odd-row")}
+            scroll={{ x: "100%" }}
+            loading={loader}
+          />
         </div>
       )}
     </div>
