@@ -21,6 +21,7 @@ import dragIcon from "../../assets/drag.png";
 
 const RowContext = React.createContext({});
 
+
 /* ----------------------------------------------------------
     ⭐ FIXED: DRAGGABLE ROW — NO FLICKER, NO JUMPING 
 ------------------------------------------------------------ */
@@ -75,6 +76,9 @@ const DraggableBodyRow = ({ style, rowIndex, total, ...restProps }) => {
   );
 };
 
+
+
+
 /* ----------------------------------------------------------
     ⭐ FIXED DRAG HANDLE — No AntD Button, No Re-render Issues
 ------------------------------------------------------------ */
@@ -101,6 +105,7 @@ const DragHandle = () => {
   );
 };
 
+
 const TableList = ({
   data,
   Header,
@@ -114,8 +119,7 @@ const TableList = ({
 }) => {
   const [tableData, setTableData] = useState(data);
   const navigate = useNavigate();
-  const [contextHolder] = notification.useNotification();
-  const [limits, setLimits] = useState({ top: 0, bottom: 0 });
+  const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
     setTableData(data);
@@ -124,65 +128,74 @@ const TableList = ({
   /* ----------------------------------------------------------
       ⭐ SENSORS (prevents accidental move on touch/click)
   ------------------------------------------------------------ */
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 4 }, // ⭐ avoid jitter on grab
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 120,
-        tolerance: 3,
-      },
-    })
-  );
+ const sensors = useSensors(
+  useSensor(PointerSensor, {
+    activationConstraint: { distance: 4 }, // ⭐ avoid jitter on grab
+  }),
+  useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 120,
+      tolerance: 3,
+    },
+  })
+);
+
 
   /* ----------------------------------------------------------
       ⭐ FIXED: REAL DRAG END LOGIC
   ------------------------------------------------------------ */
-  const onDragStart = () => {
-    const table = document.querySelector(".ant-table-body");
 
-    if (table) {
-      const rect = table.getBoundingClientRect();
-      setLimits({
-        top: rect.top,
-        bottom: rect.bottom,
-      });
-    }
-  };
+  const [isDragging, setIsDragging] = useState(false);
+const [limits, setLimits] = useState({ top: 0, bottom: 0 });
 
-  const onDragMove = (event) => {
-    if (!event.activatorEvent || !event.delta) return;
+const onDragStart = (event) => {
+  const table = document.querySelector(".ant-table-body");
 
-    const pointerY = event.activatorEvent.clientY;
+  if (table) {
+    const rect = table.getBoundingClientRect();
+    setLimits({
+      top: rect.top,
+      bottom: rect.bottom,
+    });
+  }
+};
 
-    // Stop ABOVE first row
-    if (pointerY < limits.top + 10) {
-      event.over = null;
-      event.delta.y = 0;
-      return;
-    }
+const onDragMove = (event) => {
+  if (!event.activatorEvent || !event.delta) return;
 
-    // Stop BELOW last row
-    if (pointerY > limits.bottom - 10) {
-      event.over = null;
-      event.delta.y = 0;
-      return;
-    }
-  };
+  const pointerY = event.activatorEvent.clientY;
 
-  const onDragEnd = ({ active, over }) => {
-    if (!over) return; // ⭐ blocked by onDragMove → ignore
+  // Stop ABOVE first row
+  if (pointerY < limits.top + 10) {
+    event.over = null;
+    event.delta.y = 0;
+    return;
+  }
 
-    const oldIndex = tableData.findIndex((i) => i.id === active.id);
-    const newIndex = tableData.findIndex((i) => i.id === over.id);
+  // Stop BELOW last row
+  if (pointerY > limits.bottom - 10) {
+    event.over = null;
+    event.delta.y = 0;
+    return;
+  }
+};
 
-    if (oldIndex === newIndex) return;
 
-    const reordered = arrayMove(tableData, oldIndex, newIndex);
-    setTableData(reordered);
-    handleDragEnd(reordered);
-  };
+const onDragEnd = ({ active, over }) => {
+  if (!over) return; // ⭐ blocked by onDragMove → ignore
+
+  const oldIndex = tableData.findIndex((i) => i.id === active.id);
+  const newIndex = tableData.findIndex((i) => i.id === over.id);
+
+  if (oldIndex === newIndex) return;
+
+  const reordered = arrayMove(tableData, oldIndex, newIndex);
+  setTableData(reordered);
+  handleDragEnd(reordered);
+};
+
+
+
 
   const keys = {
     area: "areaName",
@@ -264,8 +277,8 @@ const TableList = ({
         <DndContext
           sensors={sensors}
           modifiers={[restrictToVerticalAxis]}
-          onDragStart={onDragStart}
-          onDragMove={onDragMove}
+onDragStart={onDragStart}
+            onDragMove={onDragMove}
           onDragEnd={onDragEnd}
         >
           <SortableContext
@@ -279,20 +292,27 @@ const TableList = ({
               pagination={false}
               bordered
               components={{
-                body: {
-                  row: (props) => {
-                    const rowIndex = tableData.findIndex(
-                      (r) => r.id === props["data-row-key"]
-                    );
-                    return <DraggableBodyRow {...props} rowIndex={rowIndex} total={tableData.length} />;
-                  },
-                },
-              }}
+  body: {
+    row: (props) => {
+      const rowIndex = tableData.findIndex(
+        (r) => r.id === props["data-row-key"]
+      );
+      return <DraggableBodyRow {...props} rowIndex={rowIndex} total={tableData.length} />;
+    },
+  },
+}}
+
               scroll={{ x: "100%" }}
             />
           </SortableContext>
         </DndContext>
       ) : (
+        <div
+  style={{
+    height: isDragging ? "100%" : "auto",
+    overflow: "hidden",
+  }}
+>
         <Table
           dataSource={tableData}
           columns={generateColumns()}
@@ -302,6 +322,7 @@ const TableList = ({
           scroll={{ x: "100%" }}
           loading={loader}
         />
+        </div>
       )}
     </div>
   );
