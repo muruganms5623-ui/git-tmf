@@ -9,8 +9,6 @@ const SwipeablePanel = ({
   onSwipeLeft,
   renderContent,
   isExpanded,
-
-  
   onExpandToggle,
   avatarSrc
 }) => {
@@ -22,7 +20,7 @@ const SwipeablePanel = ({
 
   const { confirm } = Modal;
   const SWIPE_THRESHOLD = 60;
-  const BUTTON_WIDTH = 80;
+  const BUTTON_WIDTH = 70;
   const TAP_THRESHOLD = 10;
 
   const handleTouchStart = (e) => {
@@ -165,7 +163,8 @@ const SwipeablePanel = ({
             cursor: 'pointer',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center'
+            alignItems: 'center',
+            
           }}
           onTouchStart={isExpanded ? null : handleTouchStart}
           onTouchMove={isExpanded ? null : handleTouchMove}
@@ -211,7 +210,7 @@ const SwipeablePanel = ({
 
         {/* Expanded content */}
         {isExpanded && (
-          <div style={{ marginTop: 8, padding: '0 16px' }}>
+          <div style={{ marginTop: 8, padding: '0 5px' }}>
             {renderContent && renderContent()}
           </div>
         )}
