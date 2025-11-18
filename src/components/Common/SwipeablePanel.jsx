@@ -1,5 +1,5 @@
 import { DeleteFilled } from '@ant-design/icons';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Avatar, Modal } from 'antd';
 
 const SwipeablePanel = ({
@@ -10,23 +10,35 @@ const SwipeablePanel = ({
   renderContent,
   isExpanded,
   onExpandToggle,
-  avatarSrc
+  avatarSrc,
+  isSwipeOpen = false, // NEW: External control
+  onSwipeStateChange // NEW: Callback when swipe state changes
 }) => {
   const [offset, setOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startX = useRef(0);
   const isScrolling = useRef(false);
   const startY = useRef(0);
+  const hasNotifiedOpen = useRef(false); // NEW: Track if we've notified parent
 
   const { confirm } = Modal;
   const SWIPE_THRESHOLD = 60;
   const BUTTON_WIDTH = 70;
   const TAP_THRESHOLD = 10;
 
+  // NEW: Reset offset when another panel opens
+  useEffect(() => {
+    if (!isSwipeOpen) {
+      setOffset(0);
+      hasNotifiedOpen.current = false; // Reset flag when closed externally
+    }
+  }, [isSwipeOpen]);
+
   const handleTouchStart = (e) => {
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
     isScrolling.current = false;
+    hasNotifiedOpen.current = false; // Reset notification flag
     setIsDragging(true);
   };
 
@@ -40,6 +52,11 @@ const SwipeablePanel = ({
     }
 
     if (!isScrolling.current) {
+      // NEW: When user starts swiping, immediately claim this swipe (only once)
+      if (Math.abs(deltaX) > 10 && !hasNotifiedOpen.current) {
+        hasNotifiedOpen.current = true;
+        onSwipeStateChange && onSwipeStateChange(true);
+      }
       setOffset(deltaX);
     }
   };
@@ -48,6 +65,7 @@ const SwipeablePanel = ({
     if (isScrolling.current) {
       setOffset(0);
       setIsDragging(false);
+      hasNotifiedOpen.current = false;
       return;
     }
 
@@ -56,13 +74,26 @@ const SwipeablePanel = ({
 
     if (diff > SWIPE_THRESHOLD) {
       setOffset(maxSwipe);
+      // NEW: Notify parent that this panel is now open
+      if (!hasNotifiedOpen.current) {
+        onSwipeStateChange && onSwipeStateChange(true);
+        hasNotifiedOpen.current = true;
+      }
     } else if (diff < -SWIPE_THRESHOLD) {
       setOffset(-maxSwipe);
+      // NEW: Notify parent that this panel is now open
+      if (!hasNotifiedOpen.current) {
+        onSwipeStateChange && onSwipeStateChange(true);
+        hasNotifiedOpen.current = true;
+      }
     } else {
       if (Math.abs(diff) < TAP_THRESHOLD) {
         onExpandToggle && onExpandToggle(item);
       }
       setOffset(0);
+      hasNotifiedOpen.current = false;
+      // NEW: Notify parent that this panel is closed
+      onSwipeStateChange && onSwipeStateChange(false);
     }
 
     setIsDragging(false);
@@ -101,6 +132,9 @@ const SwipeablePanel = ({
           onClick={() => {
             onSwipeRight(item);
             setOffset(0);
+            hasNotifiedOpen.current = false;
+            // NEW: Notify parent that swipe is closed
+            onSwipeStateChange && onSwipeStateChange(false);
           }}
         >
           <span className='mdi mdi-pencil' style={{ fontSize: '20px', marginRight: 4 }}></span>
@@ -133,9 +167,16 @@ const SwipeablePanel = ({
               cancelText: 'Cancel',
               onOk() {
                 onSwipeLeft(item);
+                setOffset(0);
+                hasNotifiedOpen.current = false;
+                // NEW: Notify parent that swipe is closed
+                onSwipeStateChange && onSwipeStateChange(false);
               },
               onCancel() {
                 setOffset(0);
+                hasNotifiedOpen.current = false;
+                // NEW: Notify parent that swipe is closed
+                onSwipeStateChange && onSwipeStateChange(false);
               },
             });
           }}
