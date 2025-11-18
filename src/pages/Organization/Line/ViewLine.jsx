@@ -1,26 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Flex, notification, Grid,  List,
-  Divider,
-  Skeleton,
-  Avatar,
-  Dropdown,
-  Menu,Select,Modal } from "antd";
+import { Button, notification, Grid, List, Avatar, Dropdown, Menu, Select, Modal, Collapse, Badge } from "antd";
 import Table from "../../../components/Common/Table";
 import { GET, DELETE, POST } from "helpers/api_helper";
-import { LINE, SEARCH, COLUMNCHANGE, SELECTEDCOLUMN } from "helpers/url_helper";
+import { LINE, COLUMNCHANGE, SELECTEDCOLUMN } from "helpers/url_helper";
 import Loader from "components/Common/Loader";
 import ColumnDropdown from "../../../components/Common/ColumnDropdown";
-// import CommonSearch from "components/Common/Search";
-// import { debounce } from "lodash";
 import SwipeablePanel from "components/Common/SwipeablePanel";
-import { EllipsisOutlined,SearchOutlined,ReloadOutlined,PlusOutlined } from "@ant-design/icons";
-import InfiniteScroll from "react-infinite-scroll-component";
+import { EllipsisOutlined, SearchOutlined, ReloadOutlined, PlusOutlined, DownOutlined, RightOutlined } from "@ant-design/icons";
 import LineCollapseContent from "components/Common/LineCollapseContent";
-import { Switch,FloatButton } from "antd";
+import { Switch, FloatButton } from "antd";
 import reorderIcon from "../../../assets/up-and-down-arrow.png";
 
-
+const { Panel } = Collapse;
 
 let header = [
   {
@@ -58,8 +50,8 @@ const hiddenColumns = ["move", "order", "actions", "index"];
 const ViewLine = () => {
   const navigate = useNavigate();
   const [reOrder, setReorder] = useState(false);
-  const [rowReorderred, setRowReorderred] = useState(false);
   const [tableData, setTableData] = useState([]);
+  const [groupedData, setGroupedData] = useState({});
   const [order, setOrder] = useState({});
   const [tableHeader, setTableHeader] = useState(header);
   const [api, contextHolder] = notification.useNotification();
@@ -75,25 +67,39 @@ const ViewLine = () => {
     ],
   });
   const [selectedColumn, setSelectedColumn] = useState([]);
-const [isDragMode, setIsDragMode] = useState(true); // switch toggle state
-const [branchModalVisible, setBranchModalVisible] = useState(false);
-const [selectedBranch, setSelectedBranch] = useState(null);
-const [branchOptions, setBranchOptions] = useState([]);
-const [originalData, setOriginalData] = useState([]); // ✅ store full data
-const [searchModalVisible, setSearchModalVisible] = useState(false);
-const [searchText, setSearchText] = useState("");
-const [showReset, setShowReset] = useState(false);
-
+  const [isDragMode, setIsDragMode] = useState(true);
+  const [branchModalVisible, setBranchModalVisible] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState(null);
+  const [branchOptions, setBranchOptions] = useState([]);
+  const [originalData, setOriginalData] = useState([]);
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [showReset, setShowReset] = useState(false);
+  const [expandedBranches, setExpandedBranches] = useState([]);
+  const [expandedLines, setExpandedLines] = useState({});
+  const [openSwipeId, setOpenSwipeId] = useState(null);
 
   const { useBreakpoint } = Grid;
   const screens = useBreakpoint();
   const isMobile = !screens.md;
-  const [lineDetails, setLineDetails] = useState({});
 
   useEffect(() => {
     getSelectedColumn();
     getLineList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const groupLinesByBranch = (data) => {
+    const grouped = {};
+    data.forEach((line) => {
+      const branchName = line.branch_name || "Uncategorized";
+      if (!grouped[branchName]) {
+        grouped[branchName] = [];
+      }
+      grouped[branchName].push(line);
+    });
+    return grouped;
+  };
 
   const sortData = (order) => {
     if (Object.keys(order).length > 0) {
@@ -107,7 +113,6 @@ const [showReset, setShowReset] = useState(false);
           reorderedData.splice(order[value] - 1, 0, movedItem);
         }
       });
-
       return reorderedData;
     }
   };
@@ -119,19 +124,24 @@ const [showReset, setShowReset] = useState(false);
         Object.keys(order)?.length > 0 ? sortData(order) : tableData;
       const response = await POST(`${LINE}reorder/`, reorderedData);
       if (response?.status === 200) {
-        setTableData(reorderedData);
+        const branchItemIds = reorderedData.map(item => item.id);
+        const otherBranchItems = originalData.filter(item => !branchItemIds.includes(item.id));
+        const finalData = [...otherBranchItems, ...reorderedData];
+        
+        setOriginalData(finalData);
+        setTableData(finalData);
+        setGroupedData(groupLinesByBranch(finalData));
         setReorder(false);
-        setRowReorderred(false);
-        console.log(rowReorderred);
         const filtered = header.filter(
           (item) => !["move", "order"].includes(item.value)
         );
         setTableHeader(filtered);
         setOrder({});
-        setShowReset(true);
+        setSelectedBranch(null);
+        setShowReset(false);
         api.success({
           message: "Re-Ordered",
-          description: "The order has been updated successfully. ",
+          description: "The order has been updated successfully.",
           duration: 0,
         });
       } else {
@@ -150,70 +160,70 @@ const [showReset, setShowReset] = useState(false);
       });
     }
   };
+
   const handleReset = () => {
-  setTableData(originalData);
-  setShowReset(false);
-  setSelectedBranch(null); 
-  setSearchText("")
-  notification.success({
-    message: "Data Reset",
-    description: "Restored to the original order successfully.",
-  });
-};
+    setTableData(originalData);
+    setGroupedData(groupLinesByBranch(originalData));
+    setShowReset(false);
+    setSelectedBranch(null);
+    setSearchText("");
+    notification.success({
+      message: "Data Reset",
+      description: "Restored to the original order successfully.",
+    });
+  };
 
+  const getLineList = async () => {
+    try {
+      setTableLoader(true);
+      const response = await GET(LINE);
+      if (response?.status === 200) {
+        setTableData(response.data);
+        setOriginalData(response.data);
+        setGroupedData(groupLinesByBranch(response.data));
 
-const getLineList = async () => {
-  try {
-    setTableLoader(true);
-    const response = await GET(LINE);
-    if (response?.status === 200) {
-      setTableData(response.data);
-      setOriginalData(response.data); // ✅ save full list here
-
-      const filterCol = ["branch_name", "lineName"];
-      const uniqueOptions = {};
-      filterCol.forEach((col) => {
-        uniqueOptions[col] = new Set();
-      });
-
-      response.data.forEach((item) => {
+        const filterCol = ["branch_name", "lineName"];
+        const uniqueOptions = {};
         filterCol.forEach((col) => {
-          uniqueOptions[col].add(item[col]);
+          uniqueOptions[col] = new Set();
         });
-      });
 
-      filterCol.forEach((col) => {
-        setFilterOption((prev) => ({
-          ...prev,
-          [col]: Array.from(uniqueOptions[col]).map((value) => ({
-            text: value,
-            value: value,
-          })),
-        }));
-      });
+        response.data.forEach((item) => {
+          filterCol.forEach((col) => {
+            uniqueOptions[col].add(item[col]);
+          });
+        });
 
-      // Populate branch list
-      const uniqueBranches = [
-        ...new Set(response.data.map((item) => item.branch_name)),
-      ];
-      setBranchOptions(uniqueBranches.map((b) => ({ label: b, value: b })));
-    } else {
+        filterCol.forEach((col) => {
+          setFilterOption((prev) => ({
+            ...prev,
+            [col]: Array.from(uniqueOptions[col]).map((value) => ({
+              text: value,
+              value: value,
+            })),
+          }));
+        });
+
+        const uniqueBranches = [
+          ...new Set(response.data.map((item) => item.branch_name)),
+        ];
+        setBranchOptions(uniqueBranches.map((b) => ({ label: b, value: b })));
+      } else {
+        setTableData([]);
+        setOriginalData([]);
+        setGroupedData({});
+      }
+    } catch (error) {
       setTableData([]);
       setOriginalData([]);
+      setGroupedData({});
+    } finally {
+      setTableLoader(false);
     }
-  } catch (error) {
-    setTableData([]);
-    setOriginalData([]);
-  } finally {
-    setTableLoader(false);
-  }
-};
-
+  };
 
   const clickReorder = () => {
-     setBranchModalVisible(true);
-    
-    console.log(tableHeader)
+    setBranchModalVisible(true);
     setTableHeader((prev) => {
       return [
         { label: "Move", value: "move" },
@@ -225,25 +235,23 @@ const getLineList = async () => {
 
   const handleReOrder = (event, row) => {
     event.preventDefault();
-    setRowReorderred(true);
     setOrder((prev) => ({ ...prev, [row.id]: event.target.value }));
   };
 
   const handleDragEnd = (data) => {
     setTableData(data);
-    setRowReorderred(true);
   };
 
- const handleCancel = () => {
-  const filtered = header.filter(
-    (item) => !["move", "order"].includes(item.value)
-  );
-  setTableHeader(filtered);
-  setReorder(false);
-  setSelectedBranch(null);
-  setTableData(originalData); // ✅ restore full data
-};
-
+  const handleCancel = () => {
+    const filtered = header.filter(
+      (item) => !["move", "order"].includes(item.value)
+    );
+    setTableHeader(filtered);
+    setReorder(false);
+    setSelectedBranch(null);
+    setTableData(originalData);
+    setGroupedData(groupLinesByBranch(originalData));
+  };
 
   const onDelete = async (record) => {
     try {
@@ -252,15 +260,16 @@ const getLineList = async () => {
       if (response?.status === 200) {
         const updatedData = tableData.filter((item) => item.id !== record.id);
         setTableData(updatedData);
+        setGroupedData(groupLinesByBranch(updatedData));
         api.success({
           message: `${record?.lineName.toUpperCase()} Line Deleted!`,
-          description: "The line has been deleted successfully ",
+          description: "The line has been deleted successfully",
           duration: 0,
         });
       } else {
         api.error({
           message: "Line Delete",
-          description: "The line is not deleted ",
+          description: "The line is not deleted",
           duration: 0,
         });
       }
@@ -269,52 +278,13 @@ const getLineList = async () => {
     } catch (error) {
       setDeleteLoader(false);
       setShowConfirm(false);
-      api.success({
+      api.error({
         message: "Line Deleted",
-        description: "The line is not deleted ",
+        description: "The line is not deleted",
         duration: 0,
       });
     }
   };
-// const debouncedSearch = debounce(async (searchedvalue) => {
-//   setTableLoader(true);
-//   try {
-//     const response = await GET(`${SEARCH}?module=line&&searchText=${searchedvalue}`);
-//     if (response?.status === 200) {
-//       const data = response.data || [];
-
-//       // ✅ Update main data list
-//       setTableData(data);
-
-//       // ✅ Optionally update backup/original data
-//       setOriginalData(data);
-
-//       // ✅ Rebuild branch options (still useful)
-//       const uniqueBranches = [...new Set(data.map((item) => item.branch_name))];
-//       setBranchOptions(uniqueBranches.map((b) => ({ label: b, value: b })));
-
-//       setTableLoader(false);
-//       if (data.length === 0) {
-//         api.warning({
-//           message: "No Results",
-//           description: `No lines found for "${searchedvalue}".`,
-//         });
-//       }
-//     } else {
-//       setTableLoader(false);
-//       api.error({
-//         message: "Error",
-//         description: "No Line Found",
-//       });
-//     }
-//   } catch (error) {
-//     setTableLoader(false);
-//     api.error({
-//       message: "Error",
-//       description: "Search failed. Please try again.",
-//     });
-//   }
-// }, 700);
 
   const handleColumnChange = async (value) => {
     try {
@@ -327,7 +297,7 @@ const getLineList = async () => {
         getLineList();
       }
     } catch (error) {
-      throw error;
+      console.error("Column change error:", error);
     }
   };
 
@@ -338,208 +308,234 @@ const getLineList = async () => {
         setSelectedColumn(res?.data?.line || []);
       }
     } catch (error) {
-      throw error;
+      console.error("Get selected column error:", error);
     }
   };
-  const handleAction = (line) => {
-    setLineDetails((prev) => ({
-      ...prev,
-      [line.id]: {
-        ...prev[line.id],
-        expanded: !prev[line.id]?.expanded,
-        data: line,
-      },
-    }));
+
+  const handleLineAction = (branchName, lineId) => {
+    const key = `${branchName}-${lineId}`;
+    setExpandedLines((prev) => {
+      return {
+        [key]: !prev[key]
+      };
+    });
   };
 
-const handleBranchSubmit = () => {
-  if (!selectedBranch) {
-    notification.warning({
-      message: "Select a Branch",
-      description: "Please choose a branch before continuing.",
-    });
-    return;
-  }
+  const handleSwipeStateChange = (itemId) => {
+    if (itemId !== openSwipeId) {
+      setOpenSwipeId(itemId);
+    }
+  };
 
-  // ✅ Filter data temporarily
-  const filteredData = originalData.filter(
-    (item) => item.branch_name === selectedBranch
+  const handleBranchSubmit = () => {
+    if (!selectedBranch) {
+      notification.warning({
+        message: "Select a Branch",
+        description: "Please choose a branch before continuing.",
+      });
+      return;
+    }
+
+    const filteredData = originalData.filter(
+      (item) => item.branch_name === selectedBranch
+    );
+
+    setTableData(filteredData);
+    setBranchModalVisible(false);
+    setReorder(true);
+    setTableHeader((prev) => [
+      { label: "Move", value: "move" },
+      { label: "Order", value: "order" },
+      ...prev,
+    ]);
+  };
+
+  const handleSearch = () => {
+    const query = searchText.trim().toLowerCase();
+
+    if (!query) {
+      setTableData(originalData);
+      setGroupedData(groupLinesByBranch(originalData));
+      setSearchModalVisible(false);
+      notification.info({
+        message: "Reset Search",
+        description: "Showing all lines again.",
+      });
+      return;
+    }
+
+    const filtered = originalData.filter((item) => {
+      const lineName = (item.lineName || "").toLowerCase();
+      const branch = (item.branch_name || "").toLowerCase();
+      const lineType = (item.lineType || "").toLowerCase();
+
+      return (
+        lineName.includes(query) ||
+        branch.includes(query) ||
+        lineType.includes(query)
+      );
+    });
+
+    setTableData(filtered);
+    setGroupedData(groupLinesByBranch(filtered));
+    setSearchModalVisible(false);
+    setShowReset(true);
+
+    if (filtered.length === 0) {
+      notification.warning({
+        message: "No Results",
+        description: `No matches found for "${searchText}".`,
+      });
+    } else {
+      notification.success({
+        message: "Search Complete",
+        description: `${filtered.length} result(s) found for "${searchText}".`,
+      });
+    }
+  };
+
+  const branchSelectionModal = (
+    <Modal
+      title="Select Branch for Re-Ordering"
+      open={branchModalVisible}
+      onOk={handleBranchSubmit}
+      onCancel={() => setBranchModalVisible(false)}
+      okText="Continue"
+    >
+      <p style={{ marginBottom: 10 }}>Choose a branch to view its line list:</p>
+      <Select
+        style={{ width: "100%" }}
+        placeholder="Select Branch"
+        options={branchOptions}
+        value={selectedBranch}
+        onChange={setSelectedBranch}
+        showSearch
+        optionFilterProp="label"
+      />
+    </Modal>
   );
 
-  setTableData(filteredData);
-
-  setBranchModalVisible(false);
-  setReorder(true);
-  setTableHeader((prev) => [
-    { label: "Move", value: "move" },
-    { label: "Order", value: "order" },
-    ...prev,
-  ]);
-};
-const handleSearch = () => {
-  const query = searchText.trim().toLowerCase();
-
-  if (!query) {
-    // ✅ if empty, reset to full data
-    setTableData(originalData);
-    setSearchModalVisible(false);
-    notification.info({
-      message: "Reset Search",
-      description: "Showing all lines again.",
-    });
-    return;
-  }
-
-  // ✅ Filter from originalData with partial + case-insensitive match
-  const filtered = originalData.filter((item) => {
-    const lineName = (item.lineName || "").toLowerCase();
-    const branch = (item.branchName || "").toLowerCase();
-    const lineType = (item.lineType || "").toLowerCase();
-
-    // ✅ Match if query is part of lineName, branch, or lineType
-    return (
-      lineName.includes(query) ||
-      branch.includes(query) ||
-      lineType.includes(query)
-    );
-  });
-
-  setTableData(filtered);
-  setSearchModalVisible(false);
-setShowReset(true);
-  if (filtered.length === 0) {
-    notification.warning({
-      message: "No Results",
-      description: `No matches found for "${searchText}".`,
-    });
-  } else {
-    notification.success({
-      message: "Search Complete",
-      description: `${filtered.length} result(s) found for "${searchText}".`,
-    });
-  }
-};
-
-
-// Branch selection modal
-const branchSelectionModal = (
-  <Modal
-    title="Select Branch for Re-Ordering"
-    open={branchModalVisible}
-    onOk={handleBranchSubmit}
-    onCancel={() => setBranchModalVisible(false)}
-    okText="Continue"
-  >
-    <p style={{ marginBottom: 10 }}>Choose a branch to view its line list:</p>
-    <Select
-      style={{ width: "100%" }}
-      placeholder="Select Branch"
-      options={branchOptions}
-      value={selectedBranch}
-      onChange={setSelectedBranch}
-      showSearch
-      optionFilterProp="label"
-    />
-  </Modal>
-);
-const searchModal = (
- <Modal
-    title={<div style={{ textAlign: "center", width: "100%" }}>Search Line</div>}
-    open={searchModalVisible}
-    onOk={handleSearch}
-    onCancel={() => setSearchModalVisible(false)}
-    okText="Search">
-
-    <p style={{ marginBottom: 10 ,fontWeight: 500 }}>Line Name </p>
-    <input
-      type="text"
-      value={searchText}
-      onChange={(e) => setSearchText(e.target.value)}
-      placeholder="Enter line name to search"
-      style={{
-        width: "100%",
-        padding: "8px 10px",
-        borderRadius: "6px",
-        border: "1px solid #d9d9d9",
-        outline: "none",
-      }}
-    />
-  </Modal>
-);
-
-
+  const searchModal = (
+    <Modal
+      title={<div style={{ textAlign: "center", width: "100%" }}>Search Line</div>}
+      open={searchModalVisible}
+      onOk={handleSearch}
+      onCancel={() => setSearchModalVisible(false)}
+      okText="Search"
+    >
+      <p style={{ marginBottom: 10, fontWeight: 500 }}>Line Name</p>
+      <input
+        type="text"
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
+        placeholder="Enter line name to search"
+        style={{
+          width: "100%",
+          padding: "8px 10px",
+          borderRadius: "6px",
+          border: "1px solid #d9d9d9",
+          outline: "none",
+        }}
+      />
+    </Modal>
+  );
 
   const handleEditLine = (line) => navigate(`/line/edit/${line.id}`);
-  return (
-    <div className="page-content"style={{ paddingTop: 0, marginTop: 0 }}>
-<div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 0,
-    marginBottom: "10px",
-  }}
->
-  <h2 style={{ fontSize: "24px", fontWeight: 600, margin: 0 }}>All Lines</h2>
 
-  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-    {!reOrder && (
-      <>
-        <Button
-          
-          onClick={clickReorder}
-          disabled={reOrder}
+  return (
+    <>
+      <style>{`
+        .ant-collapse-header {
+          padding-left: 0 !important;
+          padding-right: 0 !important;
+        }
+        .ant-collapse-content-box {
+          padding-left: 0 !important;
+          padding-right: 0 !important;
+        }
+        .ant-list-item {
+          padding-left: 0 !important;
+          padding-right: 0 !important;
+        }
+      `}</style>
+      
+      <div className="page-content" style={{ paddingTop: 0, marginTop: 0 }}>
+        <div
           style={{
             display: "flex",
+            justifyContent: "space-between",
             alignItems: "center",
-            gap: "6px",
-            width: "32px"
+            marginTop: 0,
+            marginBottom: "10px",
           }}
         >
-          <img
-            src={reorderIcon}
-            alt="Reorder Icon"
-            style={{ width: "16px", height: "16px" }}
-          />
-        </Button>
-         {/* ✅ Reset button shown only after reorder submit */}
-        {showReset && (
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={handleReset}
-            title="Reset to Original"
-          />
-        )}
+          {reOrder && !branchModalVisible ? (
+            <div>
+              <h2 style={{ fontSize: "24px", fontWeight: 600, margin: 0 }}>
+                Reorder Lines
+              </h2>
+              <div style={{ fontSize: "14px", color: "#8c8c8c", marginTop: "4px" }}>
+                Selected Branch: <span style={{ color: "#1677ff", fontWeight: 500 }}>{selectedBranch}</span>
+              </div>
+            </div>
+          ) : (
+            <h2 style={{ fontSize: "24px", fontWeight: 600, margin: 0 }}>All Lines</h2>
+          )}
 
-        {/* ✅ Search button now beside reorder */}
-        <Button
-          icon={<SearchOutlined />}
-          onClick={() => setSearchModalVisible(true)}
-          type="default"
-        >
-         {!isMobile && "Search"} 
-        </Button>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {reOrder && !branchModalVisible ? (
+              <>
+                <span style={{ fontSize: "14px", fontWeight: 500, color: "#595959" }}>Slide</span>
+                <Switch
+                  checked={isDragMode}
+                  onChange={(checked) => setIsDragMode(checked)}
+                />
+              </>
+            ) : (
+              <>
+                <Button
+                  onClick={clickReorder}
+                  disabled={reOrder}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    width: "32px",
+                  }}
+                >
+                  <img
+                    src={reorderIcon}
+                    alt="Reorder Icon"
+                    style={{ width: "16px", height: "16px" }}
+                  />
+                </Button>
+                {showReset && (
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={handleReset}
+                    title="Reset to Original"
+                  />
+                )}
+                <Button
+                  icon={<SearchOutlined />}
+                  onClick={() => setSearchModalVisible(true)}
+                  type="default"
+                >
+                  {!isMobile && "Search"}
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
 
-       
-      </>
-    )}
-  </div>
-</div>
+        {branchSelectionModal}
+        {searchModal}
 
+        {tableLoader && <Loader />}
+        {contextHolder}
 
-
-    {branchSelectionModal}
-{searchModal}
-
-      {tableLoader && <Loader />}
-      {contextHolder}
-      <Flex justify="space-between" wrap="wrap">
-        
-        
-
-        <Flex gap="middle">
-          {!isMobile && (
+        {!reOrder && !isMobile && (
+          <div style={{ marginBottom: 10 }}>
             <ColumnDropdown
               options={header.filter(
                 (list) => !hiddenColumns.includes(list?.value)
@@ -548,304 +544,250 @@ const searchModal = (
               name={"line_column"}
               selectedColumn={selectedColumn}
             />
-          )}
-         
-        </Flex>
-      </Flex>
+          </div>
+        )}
 
-      {/* {isMobile && reOrder && (
-        <Table
-          data={tableData}
-          reOrder={reOrder}
-          Header={tableHeader}
-          filterOption={filterOption}
-          handleReOrder={handleReOrder}
-          handleDragEnd={handleDragEnd}
-          onDelete={onDelete}
-          deleteLoader={deleteLoader}
-          setShowConfirm={setShowConfirm}
-          showConfirm={showConfirm}
-          name={"line"}
-        />
-      )}
+        {reOrder && !branchModalVisible ? (
+          <div>
+            <Table
+              data={tableData}
+              reOrder={isDragMode}
+              Header={
+                isDragMode
+                  ? [
+                      { label: "Move", value: "move" },
+                      { label: "S.No", value: "index" },
+                      { label: "Line Name", value: "lineName" },
+                    ]
+                  : [
+                      { label: "Order", value: "order" },
+                      { label: "S.No", value: "index" },
+                      { label: "Line Name", value: "lineName" },
+                    ]
+              }
+              filterOption={filterOption}
+              handleDragEnd={isDragMode ? handleDragEnd : undefined}
+              handleReOrder={!isDragMode ? handleReOrder : undefined}
+              deleteLoader={deleteLoader}
+              setShowConfirm={setShowConfirm}
+              showConfirm={showConfirm}
+              name="line"
+            />
 
-      {isMobile && !reOrder && (
-        <GenericCollapse
-          titleKey="lineName"
-          data={tableData}
-          contentKeys={[
-            "id",
-            "lineType",
-            "installment",
-            "badinstallment",
-            "branch_name",
-            "lineOrder",
-          ]}
-          onDelete={onDelete}
-          name="line"
-        />
-      )}
-
-      {!isMobile && (
-        <Table
-          data={tableData}
-          reOrder={reOrder}
-          Header={tableHeader.filter(
-            (list) =>
-              selectedColumn.includes(list.value) ||
-              hiddenColumns.includes(list.value)
-          )}
-          filterOption={filterOption}
-          handleReOrder={handleReOrder}
-          handleDragEnd={handleDragEnd}
-          onDelete={onDelete}
-          deleteLoader={deleteLoader}
-          setShowConfirm={setShowConfirm}
-          showConfirm={showConfirm}
-          name={"line"}
-        />
-      )} */}
-
-{reOrder && !branchModalVisible ? (
-  <div>
-    {/* Switch Toggle */}
-    {selectedBranch && (
-      <h3
-        style={{
-          fontSize: "18px",
-          fontWeight: "600",
-          marginBottom: "10px",
-          color: "#1677ff",
-        }}
-      >
-        Reordering for Branch: {selectedBranch}
-      </h3>
-    )}
-    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-      
-      <Switch
-        checked={isDragMode}
-        onChange={(checked) => setIsDragMode(checked)}
-      /><span style={{ marginRight: 8, fontWeight: 500 }}>Slide</span>
-    </div>
-
-    {/* Separate table for desktop and mobile */}
-    {isMobile ? (
-      <Table
-        data={tableData}
-        reOrder={isDragMode}
-        Header={
-          isDragMode
-            ? [
-                { label: "Move", value: "move" },
-                { label: "S.No", value: "index" },
-                { label: "Line Name", value: "lineName" },
-              ]
-            : [
-                { label: "Order", value: "order" },
-                { label: "S.No", value: "index" },
-                { label: "Line Name", value: "lineName" },
-              ]
-        }
-        filterOption={filterOption}
-        handleDragEnd={isDragMode ? handleDragEnd : undefined}
-        handleReOrder={!isDragMode ? handleReOrder : undefined}
-        deleteLoader={deleteLoader}
-        setShowConfirm={setShowConfirm}
-        showConfirm={showConfirm}
-        name="line"
-      />
-    ) : (
-      <Table
-        data={tableData}
-        reOrder={isDragMode}
-        Header={
-          isDragMode
-            ? [
-                { label: "Move", value: "move" },
-                { label: "S.No", value: "index" },
-                { label: "Line Name", value: "lineName" },
-              ]
-            : [
-                { label: "Order", value: "order" },
-                { label: "S.No", value: "index" },
-                { label: "Line Name", value: "lineName" },
-              ]
-        }
-        filterOption={filterOption}
-        handleDragEnd={isDragMode ? handleDragEnd : undefined}
-        handleReOrder={!isDragMode ? handleReOrder : undefined}
-        deleteLoader={deleteLoader}
-        setShowConfirm={setShowConfirm}
-        showConfirm={showConfirm}
-        name="line"
-      />
-    )}
-
-    {/* Buttons */}
-    <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-      <Button
-        type="primary"
-        onClick={SumbitReorder}
-        loading={reorderLoader}
-        disabled={reorderLoader}
-      >
-        Submit
-      </Button>
-      <Button onClick={handleCancel}>Cancel</Button>
-    </div>
-  </div>
-) : (
-  // 📋 LIST VIEW (default view)
-  <div
-    id="scrollableDiv"
-    style={{
-
-      height: 400,
-      overflow: "auto",
-      padding: 0,
-      marginTop: 20,
-    }}
-  >
-    <InfiniteScroll
-      dataLength={tableData.length}
-      style={{ padding: "0 10px" }}
-      next={getLineList}
-      hasMore={false}
-      loader={<Skeleton avatar paragraph={{ rows: 1 }} active />}
-      endMessage={<Divider plain>End of List ✅</Divider>}
-      scrollableTarget="scrollableDiv"
-    >
-      <List
-        dataSource={tableData}
-        renderItem={(line) => {
-          const isExpanded = lineDetails[line.id]?.expanded;
-
-          return (
-            <div
-              key={line.id}
-              style={{
-                borderBottom: "2px solid #f0f0f0",
-                padding: 0,
-                marginLeft: "-10px",
-                marginRight: "-10px",
+            <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+              <Button
+                type="primary"
+                onClick={SumbitReorder}
+                loading={reorderLoader}
+                disabled={reorderLoader}
+              >
+                Submit
+              </Button>
+              <Button onClick={handleCancel}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <div
+            id="scrollableDiv"
+            style={{
+              height: 400,
+              overflow: "auto",
+              padding: 0,
+              marginTop: 20,
+            }}
+          >
+            <Collapse
+              accordion={true}
+              activeKey={expandedBranches}
+              onChange={setExpandedBranches}
+              style={{ 
+                background: "#fff",
+                border: "none"
               }}
+              expandIcon={({ isActive }) => 
+                isActive ? <DownOutlined style={{ fontSize: 12 }} /> : <RightOutlined style={{ fontSize: 12 }} />
+              }
             >
-              {isMobile ? (
-                // 📱 MOBILE VIEW
-                <div style={{ marginLeft: "-10px", padding:0 }}>
-                  <SwipeablePanel
-                    item={{
-                      ...line,
-                      lineName:
-                        line.lineName.length > 15
-                          ? `${line.lineName.slice(0, 15)}...`
-                          : line.lineName,
-                    }}
-                    index={line.id}
-                    titleKey="lineName"
-                    name="line"
-                    avatarSrc={"/path/to/lineIcon.svg"}
-                    onSwipeRight={
-                      !isExpanded ? () => handleEditLine(line) : undefined
+              {Object.keys(groupedData).map((branchName) => {
+                const isActive = expandedBranches.includes(branchName);
+                
+                return (
+                  <Panel
+                    header={
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: 0 }}>
+                        <span style={{ fontWeight: 600, fontSize: "18px", color: "#262626" }}>
+                          {branchName}
+                        </span>
+                        <Badge 
+                          count={groupedData[branchName].length} 
+                          style={{ 
+                            backgroundColor: "#52c41a",
+                            fontWeight: 500,
+                            boxShadow: "0 0 0 1px #fff"
+                          }} 
+                        />
+                      </div>
                     }
-                    onSwipeLeft={!isExpanded ? () => onDelete(line) : undefined}
-                    isExpanded={isExpanded}
-                    onExpandToggle={() => handleAction(line)}
-                    renderContent={() => <LineCollapseContent line={line} />}
-                  />
-                </div>
-              ) : (
-                // 💻 DESKTOP VIEW
-                <>
-                  <List.Item
-                    onClick={() => handleAction(line)}
+                    key={branchName}
                     style={{
-                      cursor: "pointer",
-                      background: isExpanded ? "#f9f9f9" : "#fff",
+                      marginBottom: "12px",
+                      border: "1px solid #e8e8e8",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      backgroundColor: isActive ? "#f5f5f5" : "#fff"
                     }}
+                    className={isActive ? "active-panel" : ""}
                   >
-                    <List.Item.Meta
-                      avatar={<Avatar src={"/path/to/lineIcon.svg"} />}
-                      title={
+                  <List
+                    dataSource={groupedData[branchName]}
+                    style={{ background: "#fafafa" }}
+                    renderItem={(line) => {
+                      const isExpanded = expandedLines[`${branchName}-${line.id}`];
+
+                      return (
                         <div
+                          key={line.id}
                           style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            width: "100%",
+                            borderBottom: "1px solid #e8e8e8",
+                            padding: 0,
+                            background: "#fff",
+                            marginBottom: "8px",
+                            borderRadius: "6px",
+                            overflow: "hidden"
                           }}
                         >
-                          <span
-                            style={{ fontWeight: 600, color: "#1677ff" }}
-                          >
-                            {line.lineName}
-                          </span>
+                          {isMobile ? (
+                            <div style={{ padding: 0 }}>
+                              <SwipeablePanel
+                                item={line}
+                                index={line.id}
+                                titleKey="lineName"
+                                name="line"
+                                avatarSrc={"/path/to/lineIcon.svg"}
+                                onSwipeRight={
+                                  !isExpanded ? () => handleEditLine(line) : undefined
+                                }
+                                onSwipeLeft={!isExpanded ? () => onDelete(line) : undefined}
+                                isExpanded={isExpanded}
+                                onExpandToggle={() => {
+                                  setOpenSwipeId(null);
+                                  handleLineAction(branchName, line.id);
+                                }}
+                                renderContent={() => <LineCollapseContent line={line} />}
+                                isSwipeOpen={openSwipeId === line.id}
+                                onSwipeStateChange={handleSwipeStateChange}
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <List.Item
+                                onClick={() => handleLineAction(branchName, line.id)}
+                                style={{
+                                  cursor: "pointer",
+                                  background: isExpanded ? "#f0f5ff" : "#fff",
+                                  padding: "12px 0",
+                                  transition: "all 0.3s ease"
+                                }}
+                              >
+                                <List.Item.Meta
+                                  avatar={
+                                    <Avatar 
+                                      style={{ 
+                                        backgroundColor: "#1677ff",
+                                        fontSize: "16px",
+                                        fontWeight: 600,
+                                        marginRight: 0
+                                      }}
+                                    >
+                                      {line.lineName?.charAt(0)?.toUpperCase()}
+                                    </Avatar>
+                                  }
+                                  title={
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        width: "100%",
+                                      }}
+                                    >
+                                      <span style={{ fontWeight: 500, color: "#262626", fontSize: "15px" }}>
+                                        {line.lineName}
+                                      </span>
 
-                          <Dropdown
-                            overlay={
-                              <Menu>
-                                <Menu.Item
-                                  onClick={() => handleEditLine(line)}
-                                >
-                                  Edit
-                                </Menu.Item>
-                                <Menu.Item
-                                  danger
-                                  onClick={() => onDelete(line)}
-                                >
-                                  Delete
-                                </Menu.Item>
-                              </Menu>
-                            }
-                            trigger={["click"]}
-                          >
-                            <EllipsisOutlined
-                              style={{
-                                fontSize: "22px",
-                                color: "#999",
-                                cursor: "pointer",
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </Dropdown>
+                                      <Dropdown
+                                        overlay={
+                                          <Menu>
+                                            <Menu.Item onClick={() => handleEditLine(line)}>
+                                              Edit
+                                            </Menu.Item>
+                                            <Menu.Item danger onClick={() => onDelete(line)}>
+                                              Delete
+                                            </Menu.Item>
+                                          </Menu>
+                                        }
+                                        trigger={["click"]}
+                                      >
+                                        <EllipsisOutlined
+                                          style={{
+                                            fontSize: "20px",
+                                            color: "#8c8c8c",
+                                            cursor: "pointer",
+                                            padding: "4px"
+                                          }}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      </Dropdown>
+                                    </div>
+                                  }
+                                  description={
+                                    <span style={{ fontSize: "13px", color: "#8c8c8c" }}>
+                                      {line.lineType} • {line.installment} installments
+                                    </span>
+                                  }
+                                />
+                              </List.Item>
+
+                              {isExpanded && (
+                                <div style={{ 
+                                  padding: "16px 0",
+                                  background: "#fafafa",
+                                  borderTop: "1px solid #e8e8e8"
+                                }}>
+                                  <LineCollapseContent line={line} />
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
-                      }
-                    />
-                  </List.Item>
+                      );
+                    }}
+                  />
+                </Panel>
+              );
+            })}
+            </Collapse>
+          </div>
+        )}
 
-                  {isExpanded && (
-                    <div style={{ marginTop: 6, paddingLeft: 36 }}>
-                      <LineCollapseContent line={line} />
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        }}
-      />
-    </InfiniteScroll>
-  </div>
-)}
-{!reOrder && (
-  <FloatButton
-    icon={<PlusOutlined />}
-    type="primary"
-    tooltip={<div>Add New Line</div>}
-    onClick={() => navigate("/line/add")}
-    style={{
-        right: 24,
-          bottom: 24,
-          width: 56,
-          height: 56,
-          position: "fixed", // ✅ prevents scroll-triggered shift
-          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",}}
-  />
-)}
-
-
-    </div>
+        {!reOrder && (
+          <FloatButton
+            icon={<PlusOutlined />}
+            type="primary"
+            tooltip={<div>Add New Line</div>}
+            onClick={() => navigate("/line/add")}
+            style={{
+              right: 24,
+              bottom: 24,
+              width: 56,
+              height: 56,
+              position: "fixed",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            }}
+          />
+        )}
+      </div>
+    </>
   );
 };
 
