@@ -336,17 +336,32 @@ const ViewLine = () => {
     }
   };
 
-  const handleLineAction = (branchName, lineId) => {
-    const key = `${branchName}-${lineId}`;
-    // Close any open swipe first
-    setOpenSwipeId(null);
-    setExpandedLines((prev) => {
-      // Close all other lines, keep only the clicked one
-      return {
-        [key]: !prev[key]
-      };
-    });
-  };
+const handleLineAction = (branchName, lineId) => {
+  const key = `${branchName}-${lineId}`;
+  // Close any open swipe first
+  setOpenSwipeId(null);
+  setExpandedLines((prev) => {
+    const newState = {
+      [key]: !prev[key]
+    };
+    
+    // Scroll to the item after a brief delay to allow the expand animation
+    if (newState[key]) {
+      setTimeout(() => {
+        const element = document.getElementById(`line-item-${lineId}`);
+        if (element) {
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest'
+          });
+        }
+      }, 100);
+    }
+    
+    return newState;
+  });
+};
 
   const handleSwipeStateChange = (lineId, isOpen) => {
     // When a swipe opens, set it as the currently open one (this closes all others)
@@ -588,8 +603,8 @@ const ViewLine = () => {
                 ? [
                     
                     { label: "S.No", value: "index" },
-                    { label: "Move", value: "move" },
                     { label: "Line Name", value: "lineName" },
+                    { label: "Move", value: "move" },
                   ]
                 : [
                     
@@ -699,6 +714,7 @@ const ViewLine = () => {
                 return (
                   <div
                     key={line.id}
+                    id={`line-item-${line.id}`}
                     style={{
                       borderBottom: "2px solid #f0f0f0",
                       padding: 0,
