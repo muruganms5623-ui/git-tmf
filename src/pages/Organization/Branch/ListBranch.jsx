@@ -299,7 +299,16 @@ const ListBranch = () => {
           next={fetchMoreBranches}
           hasMore={hasMore}
           loader={<Skeleton avatar paragraph={{ rows: 1 }} active />}
-          endMessage={<Divider plain>End of List✅</Divider>}
+           endMessage={
+                          <Divider plain style={{ margin: "16px 0" }}>
+                            <span style={{ color: "red", fontSize: "18px", fontWeight: "bold" }}>★*</span>
+                            <span style={{ color: "#595959", fontSize: "14px" }}>
+                              End of Branch List
+                              <span style={{ color: "red", fontSize: "18px", fontWeight: "bold" }}>*★</span>
+                            </span>
+                          </Divider>
+                        }
+          
           scrollableTarget="scrollableDiv"
         >
            {/* Search Results Header - Show only when searching */}
