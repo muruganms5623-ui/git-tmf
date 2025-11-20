@@ -11,6 +11,7 @@ import InfiniteScroll from "react-infinite-scroll-component";
 import { useNavigate } from "react-router-dom";
 import branchIcon from "assets/images/location.png";
 import SwipeablePanel from "components/Common/SwipeablePanel";
+import BranchNameModal from "components/Common/BranchNameModal";
 
 const ListBranch = () => {
   const [loading, setLoading] = useState(false);
@@ -29,6 +30,29 @@ const ListBranch = () => {
   const navigate = useNavigate();
   
   const itemsPerPage = 10;
+  const [branchModalVisible, setBranchModalVisible] = useState(false);
+const [selectedBranchName, setSelectedBranchName] = useState("");
+
+useEffect(() => {
+  const savedBranch = localStorage.getItem("defaultBranchName");
+
+  if (!savedBranch) {
+    setBranchModalVisible(true);  // Show modal on first visit
+  } else {
+    setSelectedBranchName(savedBranch);
+  }
+}, []);
+const handleSaveBranchName = (name) => {
+  localStorage.setItem("selected_branch_name", name);
+  setSelectedBranchName(name);
+  setBranchModalVisible(false);
+};
+const handleCancelBranchModal = () => {
+  notification.warning({
+    message: "Branch Name Required",
+    description: "Please enter a branch name to continue",
+  });
+};
 
   // 🧹 Delete branch
   const onDelete = async (record) => {
@@ -481,8 +505,16 @@ const ListBranch = () => {
         onClick={() => (window.location.href = "/branch/add")}
         tooltip="Add New Branch"
       />
+      <BranchNameModal
+  visible={branchModalVisible}
+  onSave={handleSaveBranchName}
+  onCancel={handleCancelBranchModal}
+/>
+
     </div>
+    
   );
+  
 };
 
 export default ListBranch;
