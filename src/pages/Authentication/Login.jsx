@@ -107,26 +107,6 @@ function Login() {
     setError('');
   };
 
-  // Fetch branches list
-  const getBranchesList = async () => {
-    setBranchLoading(true);
-    try {
-      const response = await GET(ADD_BRANCH);
-      if (response?.status === 200) {
-        setBranches(response.data);
-        // If only one branch exists, auto-select it
-        if (response.data.length === 1) {
-          setSelectedBranch(response.data[0].id);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching branches:", error);
-      CustomToast("Failed to load branches", "error");
-    } finally {
-      setBranchLoading(false);
-    }
-  };
-
   const get_user = async(token)=>{
     if(token){
       try {
@@ -382,7 +362,7 @@ function Login() {
         <div style={{ textAlign: 'center', padding: '24px 0 20px 0' }}>
           {/* Branch Header - Centered */}
           <Title level={3} style={{ margin: 0, fontWeight: 600, color: '#262626' }}>
-            Branch Selection
+            Branch
           </Title>
           
           {/* Currently Logged-In as */}
