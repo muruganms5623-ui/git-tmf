@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, notification, Grid, List, Avatar, Dropdown, Menu, Select, Modal, Collapse, Badge,Divider,Skeleton } from "antd";
+import { Button, notification, Grid, List, Avatar, Dropdown, Menu, Modal, Collapse, Badge,Divider,Skeleton } from "antd";
 import Table from "../../../components/Common/Table";
 import { GET, DELETE, POST } from "helpers/api_helper";
 import { LINE, COLUMNCHANGE, SELECTEDCOLUMN } from "helpers/url_helper";
 import Loader from "components/Common/Loader";
-import ColumnDropdown from "../../../components/Common/ColumnDropdown";
+// import ColumnDropdown from "../../../components/Common/ColumnDropdown";
 import SwipeablePanel from "components/Common/SwipeablePanel";
-import { EllipsisOutlined, SearchOutlined, ReloadOutlined, PlusOutlined, DownOutlined, RightOutlined } from "@ant-design/icons";
+import { EllipsisOutlined, SearchOutlined, ReloadOutlined, PlusOutlined} from "@ant-design/icons";
 import LineCollapseContent from "components/Common/LineCollapseContent";
 import { Switch, FloatButton } from "antd";
 import reorderIcon from "../../../assets/up-and-down-arrow.png";
 import lineIcon from '../../../assets/residential-area.png'
 import InfiniteScroll from "react-infinite-scroll-component";
 import branchIcon from "../../../assets/images/location.png"
-const { Panel } = Collapse;
+// const { Panel } = Collapse;
 
 let header = [
   {
@@ -47,7 +47,7 @@ let header = [
   { label: "Actions", value: "actions" },
 ];
 
-const hiddenColumns = ["move", "order", "actions", "index"];
+// const hiddenColumns = ["move", "order", "actions", "index"];
 
 const ViewLine = () => {
   const navigate = useNavigate();
@@ -84,7 +84,7 @@ const ViewLine = () => {
   const { useBreakpoint } = Grid;
   const screens = useBreakpoint();
   const isMobile = !screens.md;
-  const [lineDetails, setLineDetails] = useState({});
+  // const [lineDetails, setLineDetails] = useState({});
    const BRANCH_PAGE_SIZE = 10; // number of headers to load at a time
   const [visibleBranchCount, setVisibleBranchCount] = useState(BRANCH_PAGE_SIZE);
 
@@ -871,7 +871,7 @@ const handleSearch = () => {
                   <span style={{ color: "#595959", fontSize: "14px" }}>
                     End of{" "}
                     <span style={{ fontWeight: 600, color: "#262626" }}>
-                      {branchName}
+                      {branchName} branch
                     </span>{" "}
                     <span style={{ color: "red", fontSize: "18px", fontWeight: "bold" }}>*★</span>
                   </span>
