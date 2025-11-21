@@ -12,26 +12,50 @@ import { Link, useNavigate } from "react-router-dom";
 // users
 import user1 from "../../../assets/images/users/avatar-1.jpg";
 import Avatar from "../../Common/Avatar";
+import BranchNameModal from "../../Common/BranchNameModal"; // Adjust path as needed
 
 import "./ProfileMenu.css";
+
 function ProfileMenu(props) {
   // Declare a new state variable, which we'll call "menu"
   const [menu, setMenu] = useState(false);
   const [user, setUser] = useState({});
+  const [branchModalVisible, setBranchModalVisible] = useState(false);
   
   const navigate = useNavigate();
-  const currentURL=useLocation();
+  const currentURL = useLocation();
 
   const lockscreen = () => {
-    // localStorage.removeItem('access_token');
-    // localStorage.removeItem('auth_user')
-    localStorage.setItem('previousURL',currentURL.pathname)
+    localStorage.setItem('previousURL', currentURL.pathname);
     navigate('/lock-screen');
-  }
-  const logout = () =>{
+  };
+
+  const logout = () => {
     localStorage.removeItem("access_token");
     navigate('/login');
-  }
+  };
+
+  const handleChangeBranch = () => {
+    setMenu(false); // Close dropdown
+    setBranchModalVisible(true); // Open branch modal
+  };
+
+  const handleBranchSave = (branchName) => {
+    // Update selected_branch_name in localStorage
+    localStorage.setItem("selected_branch_name", branchName);
+    
+    // Close modal
+    setBranchModalVisible(false);
+    
+    // Optional: Show success notification or refresh data
+    // You might want to trigger a page reload or update global state
+    window.location.reload();
+  };
+
+  const handleBranchCancel = () => {
+    setBranchModalVisible(false);
+  };
+
   useEffect(() => {
     if (localStorage.getItem("authUser")) {
       const obj = JSON.parse(localStorage.getItem("authUser"));
@@ -65,7 +89,9 @@ function ProfileMenu(props) {
               style={{ marginRight: '8px' }}
             />
             <div className="d-inline-block text-start" style={{ lineHeight: '1.2' }}>
-              <div style={{ fontSize: '14px', fontWeight: '500', color: '#333' }}>{user.username}</div>
+              <div style={{ fontSize: '14px', fontWeight: '500', color: '#333' }}>
+                {user.username}
+              </div>
               <div style={{ fontSize: '11px', color: '#666', marginTop: '1px' }}>
                 {user.orgName ? user.orgName : "TMF"} • {user.employees?.length > 0 ? user.employees[0].branch_name : 'Main Branch'}
               </div>
@@ -75,8 +101,12 @@ function ProfileMenu(props) {
             <i className="bx bx-wrench font-size-16 align-middle me-1" />
             Org Settings
           </Link>
+          <DropdownItem onClick={handleChangeBranch}>
+            <i className="bx bx-git-branch font-size-16 align-middle me-1" />
+            Change Branch
+          </DropdownItem>
           <DropdownItem tag="a" onClick={lockscreen}>
-            <i className="bx bx-lock-open font-size-16 align-middle me-1"  />
+            <i className="bx bx-lock-open font-size-16 align-middle me-1" />
             Lock screen
           </DropdownItem>
           <DropdownItem onClick={logout} className="dropdown-item">
@@ -85,19 +115,20 @@ function ProfileMenu(props) {
           </DropdownItem>
         </DropdownMenu>
       </Dropdown>
-    
+
+      {/* Branch Name Modal */}
+      <BranchNameModal
+        visible={branchModalVisible}
+        onSave={handleBranchSave}
+        onCancel={handleBranchCancel}
+      />
     </React.Fragment>
   );
-};
+}
 
 ProfileMenu.propTypes = {
   success: PropTypes.any,
   t: PropTypes.any
 };
-
-// const mapStatetoProps = state => {
-//   const { error, success } = state.Profile;
-//   return { error, success };
-// };
 
 export default ProfileMenu;
