@@ -102,17 +102,33 @@ const LINES_PAGE_SIZE = 3; // Number of lines to load at a time
   // };
 
   useEffect(() => {
-    getSelectedColumn();
-    getLineList();
-  }, []);
-  useEffect(() => {
-  // Get branch from localStorage
   const storedBranchName = localStorage.getItem("selected_branch_name");
+  const accessToken = localStorage.getItem("access_token");
+
+  // Save branch to state
   setSelectedBranchFromStorage(storedBranchName);
-  
-  getSelectedColumn();
-  getLineList();
+
+  // Call getSelectedColumn only if branch exists
+  if (storedBranchName) {
+    getSelectedColumn();
+  }
+
+  // Call getLineList only if both token & branch name exist
+  if (storedBranchName && accessToken) {
+    getLineList();
+  } else {
+    // Retry after 300ms if token not yet ready
+    setTimeout(() => {
+      const retryToken = localStorage.getItem("access_token");
+
+      if (storedBranchName && retryToken) {
+        getLineList(); // now safe to call
+      }
+    }, 300);
+  }
 }, []);
+
+
 
   // Group data by branch name
   const groupLinesByBranch = (data) => {
@@ -530,31 +546,6 @@ const handleLineAction = (branchName, lineId) => {
     }
   };
 
-
-
-  // const handleBranchSubmit = () => {
-  //   if (!selectedBranch) {
-  //     notification.warning({
-  //       message: "Select a Branch",
-  //       description: "Please choose a branch before continuing.",
-  //     });
-  //     return;
-  //   }
-
-  //   const filteredData = originalData.filter(
-  //     (item) => item.branch_name === selectedBranch
-  //   );
-
-  //   setTableData(filteredData);
-  //   setBranchModalVisible(false);
-  //   setReorder(true);
-  //   setTableHeader((prev) => [
-  //     { label: "Move", value: "move" },
-  //     { label: "Order", value: "order" },
-  //     ...prev,
-  //   ]);
-  // };
-
 const handleSearch = () => {
   const query = searchText.trim().toLowerCase();
 
@@ -867,13 +858,13 @@ const handleSearch = () => {
               }
               endMessage={
                 <Divider plain style={{ margin: "16px 0" }}>
-                  <span style={{ color: "red", fontSize: "18px", fontWeight: "bold" }}>★*</span>
+                  <span style={{ color: "red", fontSize: "18px", fontWeight: "bold" }}>★ </span>
                   <span style={{ color: "#595959", fontSize: "14px" }}>
                     End of{" "}
                     <span style={{ fontWeight: 600, color: "#262626" }}>
-                      {branchName} branch
-                    </span>{" "}
-                    <span style={{ color: "red", fontSize: "18px", fontWeight: "bold" }}>*★</span>
+                      {branchName}
+                    </span> branch
+                    <span style={{ color: "red", fontSize: "18px", fontWeight: "bold" }}> ★</span>
                   </span>
                 </Divider>
               }
@@ -934,15 +925,21 @@ const handleSearch = () => {
                                   width: "40px",
                                   height: "40px",
                                   borderRadius: "50%",
-                                  backgroundColor: "#000",
+                                  
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
                                   flexShrink: 0
                                 }}>
-                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                                  </svg>
+                                   <img
+      src={lineIcon}
+      alt="line-icon"
+      style={{
+        width: "40px",
+        height: "4p0x",
+        objectFit: "contain"
+      }}
+    />
                                 </div>
                               }
                               title={
