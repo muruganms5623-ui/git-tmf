@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { Form, Input, Button, Select, notification } from "antd";
+import { Form, Input, Button, Select, notification, Divider, Space } from "antd";
 import { ToastContainer } from "react-toastify";
 import Loader from "components/Common/Loader";
 import { LINE, ADD_BRANCH, AREA } from "helpers/url_helper";
 import { POST, GET } from "helpers/api_helper";
 import { useParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeftOutlined, ReloadOutlined } from "@ant-design/icons";
+// import { ArrowLeftOutlined, ReloadOutlined } from "@ant-design/icons";
 
 const { Option } = Select;
 
@@ -24,17 +24,44 @@ const AddArea = () => {
   const [form] = Form.useForm();
   const params = useParams();
   const navigate = useNavigate();
+  const [selectedBranch, setSelectedBranch] = useState(null);
 
   useEffect(() => {
     getBranchList();
-    getLineList();
   }, []);
+
+  // Set branch from localStorage after branch list is loaded
+  useEffect(() => {
+    if (branchList.length > 0 && !params.id) {
+      const storedBranchName = localStorage.getItem('selected_branch_name');
+      
+      if (storedBranchName) {
+        // Find the branch from branchList that matches the stored name
+        const matchedBranch = branchList.find(
+          branch => branch.branch_name === storedBranchName
+        );
+        
+        if (matchedBranch) {
+          setSelectedBranch(matchedBranch);
+          setFormData(prev => ({ ...prev, branch_id: matchedBranch.id }));
+          form.setFieldsValue({ branch_id: matchedBranch.id });
+        }
+      }
+    }
+  }, [branchList, params.id, form]);
 
   useEffect(() => {
     if (params.id) {
       getAreaDetails();
     }
-  });
+  }, [params.id]);
+
+  // Fetch lines when branch is selected
+  useEffect(() => {
+    if (formData?.branch_id) {
+      getLineList(formData.branch_id);
+    }
+  }, [formData?.branch_id]);
 
   const getAreaDetails = async () => {
     try {
@@ -79,12 +106,20 @@ const AddArea = () => {
     }
   };
 
-  const getLineList = async () => {
+  const getLineList = async (branchId = null) => {
     try {
       setLineLoader(true);
       const response = await GET(LINE);
       if (response?.status === 200) {
-        setLineList(response?.data);
+        // Filter lines by branch if branchId is provided
+        if (branchId) {
+          const filteredLines = response?.data?.filter(
+            (line) => line?.branch === branchId
+          );
+          setLineList(filteredLines);
+        } else {
+          setLineList(response?.data);
+        }
       } else {
         setLineList([]);
       }
@@ -102,14 +137,15 @@ const AddArea = () => {
       setLoader(false);
       if (response.status >= 400) {
         notification.error({
-          message: `${params.id ? "Update" : "Create"}`,
+          message: "Area",
           description: `The area is not ${
             params?.id ? "updated" : "created"
-          }. Please Try again`,
+          }. Please try again`,
           duration: 0,
         });
         return;
       }
+      
       setFormData({
         line_id: "",
         areaName: "",
@@ -120,9 +156,10 @@ const AddArea = () => {
         areaName: "",
         branch_id: "",
       });
+      
       notification.success({
-        message: `${formData?.areaName} Area ${
-          params.id ? "Updated" : "Created"
+        message: `${formData?.areaName?.toUpperCase()} Area ${
+          params.id ? "Update" : "Create"
         }!`,
         description: `The area has been ${
           params?.id ? "updated" : "created"
@@ -144,62 +181,84 @@ const AddArea = () => {
 
   const onValuesChange = (changedValues, allValues) => {
     if (changedValues?.branch_id) {
+      // Clear line selection when branch changes
       setFormData({ ...formData, ...allValues, line_id: "" });
       form.setFieldsValue({
         line_id: "",
       });
+      // Fetch lines for the new branch
+      getLineList(allValues.branch_id);
       return;
     }
     setFormData({ ...formData, ...allValues });
   };
 
-  const resetForm = () => {
-    setFormData({
-      line_id: "",
-      areaName: "",
-      branch_id: "",
-    });
-    form.setFieldsValue({
-      line_id: "",
-      areaName: "",
-      branch_id: "",
-    });
-  };
+  // const resetForm = () => {
+  //   setFormData({
+  //     line_id: "",
+  //     areaName: "",
+  //     branch_id: "",
+  //   });
+  //   form.setFieldsValue({
+  //     line_id: "",
+  //     areaName: "",
+  //     branch_id: "",
+  //   });
+  // };
 
-  const isFormEmpty = () => {
-    return !formData.line_id && !formData.branch_id && !formData.areaName;
-  };
-  console.log("formData", formData);
+  // const isFormEmpty = () => {
+  //   return !formData.line_id && !formData.branch_id && !formData.areaName;
+  // };
 
   return (
     <>
       {loader && <Loader />}
 
-      <div className="page-content">
-        <div className="cursor-pointer back-icon">
-          <span onClick={() => navigate("/area")}>
-            <ArrowLeftOutlined /> Back
-          </span>
-        </div>
-
+      <div
+        className="page-content"
+        style={{
+          marginRight: "10px",
+          marginLeft: "-10px",
+          maxWidth: "100%",
+        }}
+      >
         <div
           className="container-fluid"
-          style={{ paddingTop: params?.id ? "25px" : "" }}
+          style={{
+            marginTop: -100,
+            padding: 0,
+          }}
         >
           <div className="row">
             <div className="col-md-12">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h5>Area Details</h5>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginBottom: "20px",
+                  gap: "10px",
+                }}
+              >
+                {/* <ArrowLeftOutlined
+                  onClick={() => navigate("/area")}
+                  style={{ cursor: "pointer", fontSize: "18px" }}
+                /> */}
+                <h2 style={{ margin: 0, fontSize: "24px", fontWeight: 600 }}>
+                  {params.id ? "Edit Area" : "Add Area"}
+                </h2>
               </div>
+
               <Form
                 form={form}
-                onFinish={onFinish}
                 layout="vertical"
+                onFinish={onFinish}
                 onValuesChange={onValuesChange}
                 initialValues={formData}
+                style={{ padding: 0, marginRight: "-20px", marginBottom: "-30px" }}
               >
-                <div className="card p-4 shadow-sm">
-                  <div className="row mb-3">
+                <div className="container" style={{ padding: 0 }}>
+                  {/* Branch and Line */}
+                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
                         label="Branch"
@@ -207,16 +266,17 @@ const AddArea = () => {
                         rules={[
                           {
                             required: true,
-                            message: "This field is required!",
+                            message: "Branch is required",
                           },
                         ]}
                       >
                         <Select
                           placeholder="Select Branch"
-                          allowClear={!params.id}
+                          allowClear={false}
                           showSearch
                           size="large"
                           loading={branchLoader}
+                          disabled={true}
                         >
                           {branchList?.map((branch) => (
                             <Option key={branch?.id} value={branch?.id}>
@@ -226,6 +286,7 @@ const AddArea = () => {
                         </Select>
                       </Form.Item>
                     </div>
+
                     <div className="col-md-6">
                       <Form.Item
                         label="Line"
@@ -233,7 +294,7 @@ const AddArea = () => {
                         rules={[
                           {
                             required: true,
-                            message: "This field is required!",
+                            message: "Line is required",
                           },
                         ]}
                       >
@@ -243,23 +304,20 @@ const AddArea = () => {
                           showSearch
                           size="large"
                           loading={lineLoader}
+                          disabled={!formData?.branch_id}
                         >
-                         {lineList?.map((line) => {
-  if (formData?.branch_id === line?.branch) {
-    return (
-      <Option key={line?.lineName} value={line?.id}>
-        {line?.lineName}
-      </Option>
-    );
-  }
-  return null; // always return something
-})}
-
+                          {lineList?.map((line) => (
+                            <Option key={line?.id} value={line?.id}>
+                              {line?.lineName}
+                            </Option>
+                          ))}
                         </Select>
                       </Form.Item>
                     </div>
                   </div>
-                  <div className="row mb-3">
+
+                  {/* Area Name */}
+                  <div className="row mb-2">
                     <div className="col-md-6">
                       <Form.Item
                         label="Area Name"
@@ -267,35 +325,48 @@ const AddArea = () => {
                         rules={[
                           {
                             required: true,
-                            message: "This field is required!",
+                            message: "Area Name is required",
                           },
                         ]}
                       >
-                        <Input placeholder="Enter the Area Name" size="large" />
+                        <Input placeholder="Enter area name" size="large" />
                       </Form.Item>
                     </div>
                   </div>
-                  <div className="d-flex justify-content-center mt-4">
-                    <Button type="primary" htmlType="submit" className="me-3">
-                      {params.id ? "Update" : "Submit"}
-                    </Button>
-                    {!isFormEmpty() && (
-                      <Button
-                        type="default"
-                        icon={<ReloadOutlined />}
-                        onClick={resetForm}
-                        variant="solid"
-                        color="danger"
-                      >
-                        Reset
+
+                  <Divider style={{ borderTop: "2px solid #d9d9d9" }} />
+
+                  {/* Buttons */}
+                  <div className="text-center mt-4">
+                    <Space size="large">
+                      <Button type="primary" htmlType="submit" size="large">
+                        {params.id ? "Update Area" : "Add Area"}
                       </Button>
-                    )}
+
+                      {/* {!isFormEmpty() && (
+                        <Button
+                          size="large"
+                          onClick={resetForm}
+                          icon={<ReloadOutlined />}
+                        >
+                          Reset
+                        </Button>
+                      )} */}
+
+                      <Button
+                        size="large"
+                        onClick={() => navigate("/area")}
+                      >
+                        Cancel
+                      </Button>
+                    </Space>
                   </div>
                 </div>
               </Form>
             </div>
           </div>
         </div>
+
         <ToastContainer />
       </div>
     </>
