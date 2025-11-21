@@ -26,33 +26,48 @@ const ListBranch = () => {
   const [displayedBranches, setDisplayedBranches] = useState([]);
   const [hasMore, setHasMore] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
-  const [openSwipeId, setOpenSwipeId] = useState(null); // NEW: Track which swipe is open
+  const [openSwipeId, setOpenSwipeId] = useState(null);
   const navigate = useNavigate();
   
   const itemsPerPage = 10;
   const [branchModalVisible, setBranchModalVisible] = useState(false);
-const [selectedBranchName, setSelectedBranchName] = useState("");
+  const [selectedBranchName, setSelectedBranchName] = useState("");
+  const [isInitialized, setIsInitialized] = useState(false); // NEW: Track initialization
 
-useEffect(() => {
-  const savedBranch = localStorage.getItem("defaultBranchName");
+  // NEW: Check if branch was previously selected
+  useEffect(() => {
+    const savedBranch = localStorage.getItem("selected_branch_name");
+    if (savedBranch) {
+      setSelectedBranchName(savedBranch);
+      setIsInitialized(true);
+    } else {
+      // Wait for token to be available before showing modal
+      const checkToken = () => {
+        const token = localStorage.getItem("access_token");
+        if (token) {
+          setIsInitialized(true);
+          setBranchModalVisible(true);
+        } else {
+          // Retry after 300ms
+          setTimeout(checkToken, 300);
+        }
+      };
+      checkToken();
+    }
+  }, []);
 
-  if (!savedBranch) {
-    setBranchModalVisible(true);  // Show modal on first visit
-  } else {
-    setSelectedBranchName(savedBranch);
-  }
-}, []);
-const handleSaveBranchName = (name) => {
-  localStorage.setItem("selected_branch_name", name);
-  setSelectedBranchName(name);
-  setBranchModalVisible(false);
-};
-const handleCancelBranchModal = () => {
-  notification.warning({
-    message: "Branch Name Required",
-    description: "Please enter a branch name to continue",
-  });
-};
+  const handleSaveBranchName = (name) => {
+    localStorage.setItem("selected_branch_name", name);
+    setSelectedBranchName(name);
+    setBranchModalVisible(false);
+  };
+
+  const handleCancelBranchModal = () => {
+    notification.warning({
+      message: "Branch Name Required",
+      description: "Please select a branch name to continue",
+    });
+  };
 
   // 🧹 Delete branch
   const onDelete = async (record) => {
@@ -82,7 +97,7 @@ const handleCancelBranchModal = () => {
     } finally {
       setDeleteLoader(false);
       setShowConfirm(false);
-      setOpenSwipeId(null); // Close swipe after delete
+      setOpenSwipeId(null);
     }
   };
 
@@ -104,7 +119,17 @@ const handleCancelBranchModal = () => {
   }, []);
 
   useEffect(() => {
-    getBranchesList();
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      getBranchesList();
+    } else {
+      setTimeout(() => {
+        const retryToken = localStorage.getItem("access_token");
+        if (retryToken) {
+          getBranchesList();
+        }
+      }, 300);
+    }
   }, [getBranchesList]);
 
   // 🔍 Handle Search Modal Actions
@@ -145,23 +170,20 @@ const handleCancelBranchModal = () => {
     setSearchTerm("");
     setDisplayedBranches(branches.slice(0, itemsPerPage));
     setHasMore(branches.length > itemsPerPage);
-    setOpenSwipeId(null); // Close any open swipe
+    setOpenSwipeId(null);
   };
 
-  // NEW: Handle expand/collapse with swipe closure
   const handleAction = async (branch) => {
-    setOpenSwipeId(null); // Close any open swipe when toggling expand
+    setOpenSwipeId(null);
     
     setBranchDetails((prev) => {
       const isAlreadyExpanded = prev[branch.id]?.expanded;
 
-      // collapse all others first
       const newState = {};
       Object.keys(prev).forEach((id) => {
         newState[id] = { ...prev[id], expanded: false };
       });
 
-      // toggle clicked one
       newState[branch.id] = {
         expanded: !isAlreadyExpanded,
         data: prev[branch.id]?.data || null,
@@ -170,7 +192,6 @@ const handleCancelBranchModal = () => {
       return newState;
     });
 
-    // Fetch details only if expanding for the first time
     if (!branchDetails[branch.id]?.data) {
       try {
         const response = await GET(`/api/branch/${branch.id}/`);
@@ -194,7 +215,6 @@ const handleCancelBranchModal = () => {
     }
   };
 
-  // NEW: Handle swipe state changes
   const handleSwipeStateChange = (branchId, isOpen) => {
     if (isOpen) {
       setOpenSwipeId(branchId);
@@ -203,7 +223,6 @@ const handleCancelBranchModal = () => {
     }
   };
 
-  // Action menu (Edit/Delete)
   const renderMenu = (branch) => (
     <Menu>
       <Menu.Item
@@ -272,7 +291,6 @@ const handleCancelBranchModal = () => {
     <div className="page-content" style={{ padding: "0px" }}>
       {loading && <Loader />}
 
-      {/* 🔹 Header Section */}
       <div
         style={{
           display: "flex",
@@ -307,7 +325,6 @@ const handleCancelBranchModal = () => {
         </div>
       </div>
 
-      {/* 🧾 Branch List */}
       <div
         id="scrollableDiv"
         style={{
@@ -323,45 +340,43 @@ const handleCancelBranchModal = () => {
           next={fetchMoreBranches}
           hasMore={hasMore}
           loader={<Skeleton avatar paragraph={{ rows: 1 }} active />}
-           endMessage={
-                          <Divider plain style={{ margin: "16px 0" }}>
-                            <span style={{ color: "red", fontSize: "18px", fontWeight: "bold" }}>★*</span>
-                            <span style={{ color: "#595959", fontSize: "14px" }}>
-                              End of Branch List
-                              <span style={{ color: "red", fontSize: "18px", fontWeight: "bold" }}>*★</span>
-                            </span>
-                          </Divider>
-                        }
-          
+          endMessage={
+            <Divider plain style={{ margin: "16px 0" }}>
+              <span style={{ color: "red", fontSize: "18px", fontWeight: "bold" }}>★ </span>
+              <span style={{ color: "#595959", fontSize: "14px" }}>
+                End of Branch List
+                <span style={{ color: "red", fontSize: "18px", fontWeight: "bold" }}> ★</span>
+              </span>
+            </Divider>
+          }
           scrollableTarget="scrollableDiv"
         >
-           {/* Search Results Header - Show only when searching */}
-    {searchTerm && (
-      <div
-        style={{
-          padding: "12px 0px",
-          marginBottom: "16px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "left"
-        }}
-      >
-        <span style={{ fontSize: "14px", color: "#8c8c8c" }}>
-          Search Results:{" "}
-          <span style={{ fontWeight: 600, color: "#1677ff", fontSize: "15px" }}>
-            "{searchTerm}"
-          </span>
-        </span>
-        <span style={{ 
-          marginLeft: "12px", 
-          fontSize: "13px", 
-          color: "#52c41a",
-          fontWeight: 500 
-        }}>
-          ({displayedBranches.length} result{displayedBranches.length !== 1 ? 's' : ''})
-        </span>
-      </div>
-    )}
+          {searchTerm && (
+            <div
+              style={{
+                padding: "12px 0px",
+                marginBottom: "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "left"
+              }}
+            >
+              <span style={{ fontSize: "14px", color: "#8c8c8c" }}>
+                Search Results:{" "}
+                <span style={{ fontWeight: 600, color: "#1677ff", fontSize: "15px" }}>
+                  "{searchTerm}"
+                </span>
+              </span>
+              <span style={{ 
+                marginLeft: "12px", 
+                fontSize: "13px", 
+                color: "#52c41a",
+                fontWeight: 500 
+              }}>
+                ({displayedBranches.length} result{displayedBranches.length !== 1 ? 's' : ''})
+              </span>
+            </div>
+          )}
           <List
             dataSource={displayedBranches}
             renderItem={(branch) => {
@@ -389,7 +404,6 @@ const handleCancelBranchModal = () => {
                   }}
                 >
                   {isMobile ? (
-                    // 📱 MOBILE VIEW: Swipeable
                     <SwipeablePanel
                       item={branch}
                       index={branch.id}
@@ -409,7 +423,6 @@ const handleCancelBranchModal = () => {
                       onSwipeStateChange={(isOpen) => handleSwipeStateChange(branch.id, isOpen)}
                     />
                   ) : (
-                    // 💻 DESKTOP VIEW
                     <>
                       <List.Item
                         style={{
@@ -463,7 +476,6 @@ const handleCancelBranchModal = () => {
         </InfiniteScroll>
       </div>
 
-      {/* 🔹 Search Modal */}
       <Modal
         title={<div style={{ textAlign: "center", width: "100%" }}>Search Branches</div>}
         open={searchModalVisible}
@@ -490,7 +502,6 @@ const handleCancelBranchModal = () => {
         </Form>
       </Modal>
 
-      {/* 🔹 Floating Add Branch Button */}
       <FloatButton
         icon={<PlusOutlined />}
         type="primary"
@@ -505,16 +516,17 @@ const handleCancelBranchModal = () => {
         onClick={() => (window.location.href = "/branch/add")}
         tooltip="Add New Branch"
       />
-      <BranchNameModal
-  visible={branchModalVisible}
-  onSave={handleSaveBranchName}
-  onCancel={handleCancelBranchModal}
-/>
 
+      {/* Only show modal when initialized and token is ready */}
+      {isInitialized && (
+        <BranchNameModal
+          visible={branchModalVisible}
+          onSave={handleSaveBranchName}
+          onCancel={handleCancelBranchModal}
+        />
+      )}
     </div>
-    
   );
-  
 };
 
 export default ListBranch;
