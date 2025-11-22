@@ -55,7 +55,7 @@ const VerticalLayout = (props) => {
       { key: '/line', icon: <LineChartOutlined />, label: 'Line' },
       { key: '/area', icon: <EnvironmentOutlined />, label: 'Area' },
       // { key: '/expense/list', icon: <DollarOutlined />, label: 'Expense Type' },
-      // { key: '/investment', icon: <DollarOutlined />, label: 'Investments' },
+      { key: '/investment', icon: <DollarOutlined />, label: 'Investments' },
       // { key: '/expense-transaction', icon: <FileOutlined />, label: 'Expense Transactions' },
     ],
   },
