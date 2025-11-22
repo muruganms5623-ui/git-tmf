@@ -21,6 +21,7 @@ function ProfileMenu(props) {
   const [menu, setMenu] = useState(false);
   const [user, setUser] = useState({});
   const [branchModalVisible, setBranchModalVisible] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState("");
   
   const navigate = useNavigate();
   const currentURL = useLocation();
@@ -43,6 +44,7 @@ function ProfileMenu(props) {
   const handleBranchSave = (branchName) => {
     // Update selected_branch_name in localStorage
     localStorage.setItem("selected_branch_name", branchName);
+    setSelectedBranch(branchName);
     
     // Close modal
     setBranchModalVisible(false);
@@ -60,6 +62,12 @@ function ProfileMenu(props) {
     if (localStorage.getItem("authUser")) {
       const obj = JSON.parse(localStorage.getItem("authUser"));
       setUser(obj);
+    }
+    
+    // Get selected branch from localStorage
+    const storedBranch = localStorage.getItem("selected_branch_name");
+    if (storedBranch) {
+      setSelectedBranch(storedBranch);
     }
   }, [props.success]);
 
@@ -102,8 +110,22 @@ function ProfileMenu(props) {
             Org Settings
           </Link>
           <DropdownItem onClick={handleChangeBranch}>
-            <i className="bx bx-git-branch font-size-16 align-middle me-1" />
-            Change Branch
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <i className="bx bx-git-branch font-size-16 align-middle me-1" style={{ marginTop: '2px' }} />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div>Change Branch</div>
+                {selectedBranch && (
+                  <div style={{ 
+                    fontSize: '11px', 
+                    color: '#1677ff', 
+                    fontWeight: '500',
+                    marginTop: '2px'
+                  }}>
+                    Selected: {selectedBranch}
+                  </div>
+                )}
+              </div>
+            </div>
           </DropdownItem>
           <DropdownItem tag="a" onClick={lockscreen}>
             <i className="bx bx-lock-open font-size-16 align-middle me-1" />
